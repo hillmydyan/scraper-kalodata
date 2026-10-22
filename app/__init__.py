@@ -44,6 +44,19 @@ def create_app() -> Flask:
         flash("Sesi form telah kedaluwarsa. Silakan coba lagi.", "warning")
         return redirect(url_for("auth.login"))
 
+    @app.errorhandler(500)
+    def handle_500_error(e):
+        import traceback
+        tb = traceback.format_exc()
+        return f"""
+        <div style="font-family:sans-serif;max-width:900px;margin:2rem auto;padding:1.5rem;border:1px solid #e11d48;border-radius:8px;background:#fff1f2;">
+          <h2 style="color:#be123c;margin-top:0;">500 Internal Server Error</h2>
+          <p>Terjadi error saat memproses request. Detail log:</p>
+          <pre style="background:#1e293b;color:#f8fafc;padding:1rem;border-radius:6px;overflow-x:auto;font-size:0.85rem;">{tb}</pre>
+          <a href="/" style="display:inline-block;margin-top:1rem;padding:0.5rem 1rem;background:#be123c;color:#fff;border-radius:4px;text-decoration:none;">Kembali ke Beranda</a>
+        </div>
+        """, 500
+
     # Initialize DB
     init_db()
 
