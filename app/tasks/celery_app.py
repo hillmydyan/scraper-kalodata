@@ -4,6 +4,7 @@ Follows rules in PRD §8.1, §8.2, and §13.2.
 """
 
 from datetime import date, datetime, timedelta, timezone
+from typing import Optional, Dict, Any, List
 from celery import Celery
 from celery.schedules import crontab
 import structlog
