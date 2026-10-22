@@ -42,6 +42,10 @@ celery_app.conf.beat_schedule = {
         "task": "app.tasks.celery_app.run_daily_pipeline",
         "schedule": crontab(hour=settings.APP_CONFIG.get("app", {}).get("schedule_hour_wib", 1), minute=0),
     },
+    "check-custom-schedule": {
+        "task": "app.tasks.celery_app.check_and_run_scheduled_pipeline",
+        "schedule": crontab(minute="*"),
+    },
     "daily-retention-cleanup": {
         "task": "app.tasks.celery_app.run_cleanup",
         "schedule": crontab(hour=3, minute=0),
@@ -51,6 +55,56 @@ celery_app.conf.beat_schedule = {
         "schedule": crontab(hour="*/6", minute=0),
     }
 }
+
+
+@celery_app.task(name="app.tasks.celery_app.check_and_run_scheduled_pipeline")
+def check_and_run_scheduled_pipeline():
+    """
+    Checks every minute if custom configured schedule matches current WIB time.
+    """
+    import zoneinfo
+    wib_tz = zoneinfo.ZoneInfo("Asia/Jakarta")
+    now_wib = datetime.now(wib_tz)
+    current_time_str = now_wib.strftime("%H:%M")
+
+    db = SessionLocal()
+    try:
+        from app.models.entities import Setting, ScrapeRun
+        setting = db.get(Setting, "schedule_config")
+        if not setting or not isinstance(setting.value, dict):
+            return "No custom schedule configured"
+
+        cfg = setting.value
+        if not cfg.get("auto_schedule", True):
+            return "Auto schedule disabled"
+
+        raw_time = str(cfg.get("time", "")).replace("WIB", "").strip()
+        target_time_str = None
+        for fmt in ("%H:%M", "%I:%M %p", "%I:%M%p"):
+            try:
+                t = datetime.strptime(raw_time, fmt).time()
+                target_time_str = t.strftime("%H:%M")
+                break
+            except ValueError:
+                pass
+
+        if not target_time_str or target_time_str != current_time_str:
+            return f"Time mismatch: current {current_time_str} != target {target_time_str}"
+
+        # Check if already ran today for scheduled trigger
+        today = now_wib.date()
+        already_ran = db.query(ScrapeRun).filter(
+            ScrapeRun.trigger == "scheduled",
+            ScrapeRun.period_start == today - timedelta(days=1)
+        ).first()
+
+        if already_ran:
+            return "Already executed today"
+
+        logger.info("Executing scheduled pipeline for custom time", target_time=target_time_str)
+        return run_daily_pipeline()
+    finally:
+        db.close()
 
 
 @celery_app.task(name="app.tasks.celery_app.run_daily_pipeline")
