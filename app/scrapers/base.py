@@ -166,12 +166,14 @@ class BaseScraper:
             display=env.get("DISPLAY")
         )
 
+        user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
         kwargs = {
             "user_data_dir": str(self.profile_dir),
             "headless": headless,
             "slow_mo": slow_mo,
             "args": args,
             "viewport": {"width": 1440, "height": 900},
+            "user_agent": user_agent,
             "env": env,
         }
         if channel:
@@ -213,6 +215,7 @@ class BaseScraper:
                         "--disable-gpu",
                     ],
                     "viewport": {"width": 1440, "height": 900},
+                    "user_agent": user_agent,
                     "env": attempt_env,
                 }
                 try:
@@ -222,6 +225,19 @@ class BaseScraper:
                     raise head_ex
             elif self.browser_context is None:
                 raise ex
+
+        # Stealth init script to mask automation & navigator.webdriver
+        try:
+            self.browser_context.add_init_script("""
+                Object.defineProperty(navigator, 'webdriver', {
+                    get: () => undefined
+                });
+                window.chrome = {
+                    runtime: {}
+                };
+            """)
+        except Exception:
+            pass
 
         # Auto-import portable session cookies if kalodata_session.json exists
         session_file = settings.RUNTIME_DIR / "kalodata_session.json"
