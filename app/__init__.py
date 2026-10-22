@@ -3,9 +3,9 @@ Flask Application Factory for Kalodata Scraper & Dashboard.
 Follows rules in PRD §5, §9, and §14.
 """
 
-from flask import Flask, redirect, url_for
+from flask import Flask, redirect, url_for, flash
 from flask_login import LoginManager
-from flask_wtf.csrf import CSRFProtect
+from flask_wtf.csrf import CSRFProtect, CSRFError
 
 from app.config import settings
 from app.models import SessionLocal, init_db
@@ -28,6 +28,7 @@ def create_app() -> Flask:
     app = Flask(__name__)
     app.config["SECRET_KEY"] = settings.SECRET_KEY
     app.config["WTF_CSRF_ENABLED"] = True
+    app.config["WTF_CSRF_TIME_LIMIT"] = None
     app.config["TEMPLATES_AUTO_RELOAD"] = True
     app.jinja_env.auto_reload = True
 
@@ -37,6 +38,11 @@ def create_app() -> Flask:
     login_manager.login_message = "Silakan login terlebih dahulu untuk mengakses halaman ini."
     login_manager.login_message_category = "warning"
     csrf.init_app(app)
+
+    @app.errorhandler(CSRFError)
+    def handle_csrf_error(e):
+        flash("Sesi form telah kedaluwarsa. Silakan coba lagi.", "warning")
+        return redirect(url_for("auth.login"))
 
     # Initialize DB
     init_db()
