@@ -12,7 +12,7 @@ import re
 import sys
 import time
 from datetime import date, timedelta
-from typing import List, Dict, Any, Optional, Callable
+from typing import List, Dict, Any, Optional, Callable, Tuple
 import structlog
 from playwright.sync_api import Page
 

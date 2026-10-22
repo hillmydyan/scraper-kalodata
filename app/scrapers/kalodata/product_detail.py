@@ -3,7 +3,7 @@ Product detail page scraper and video selection engine.
 Follows rules in PRD §6.4, §6.7, and §6.8.
 """
 
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List, Tuple
 import structlog
 from playwright.sync_api import Page
 

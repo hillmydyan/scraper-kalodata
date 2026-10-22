@@ -3,7 +3,7 @@ Product list table scraper, pagination, checkpointing, and validation.
 Follows rules in PRD §6.5, §6.8, §6.10, and §6.11.
 """
 
-from typing import List, Dict, Any, Optional, Callable
+from typing import List, Dict, Any, Optional, Callable, Tuple
 import structlog
 from playwright.sync_api import Page
 
