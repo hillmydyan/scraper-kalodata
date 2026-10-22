@@ -73,7 +73,7 @@ class KalodataNavigator:
         try:
             if dropdown.is_visible(timeout=3000):
                 current_text = dropdown.inner_text().strip().upper()
-                if country_code.upper() in current_text:
+                if country_code.upper() in current_text or region_label.upper() in current_text:
                     logger.info("Region already set to target", country=country_code, current=current_text)
                     return True
         except Exception:
@@ -104,21 +104,27 @@ class KalodataNavigator:
             self.page.wait_for_timeout(800)
             # Click country option inside popover
             opt_clicked = False
-            try:
-                popover = self.page.locator(".region-dropdown-popover:not(.ant-popover-hidden), .ant-popover:not(.ant-popover-hidden)").first
-                if popover.is_visible(timeout=2500):
-                    opt = popover.locator(f"text={region_label}").first
-                    if opt.is_visible(timeout=1500):
-                        opt.click(force=True)
-                        opt_clicked = True
-            except Exception:
-                pass
+            for target_opt in [region_label, country_code]:
+                try:
+                    popover = self.page.locator(".region-dropdown-popover:not(.ant-popover-hidden), .ant-popover:not(.ant-popover-hidden)").first
+                    if popover.is_visible(timeout=1500):
+                        opt = popover.locator(f"text={target_opt}").first
+                        if opt.is_visible(timeout=1000):
+                            opt.click(force=True)
+                            opt_clicked = True
+                            break
+                except Exception:
+                    pass
 
             if not opt_clicked:
-                try:
-                    self.page.get_by_text(region_label, exact=False).first.click(force=True, timeout=2000)
-                    opt_clicked = True
-                except Exception:
+                for target_opt in [region_label, country_code]:
+                    try:
+                        self.page.get_by_text(target_opt, exact=False).first.click(force=True, timeout=1500)
+                        opt_clicked = True
+                        break
+                    except Exception:
+                        pass
+                if not opt_clicked:
                     logger.warning("Could not click region text directly", region_label=region_label)
 
             BaseScraper.pacing_page_delay()
@@ -130,7 +136,7 @@ class KalodataNavigator:
         # 1. Verify via #region-dropdown indicator
         try:
             new_text = self.page.locator("#region-dropdown").first.inner_text().strip().upper()
-            if country_code.upper() in new_text:
+            if country_code.upper() in new_text or region_label.upper() in new_text:
                 logger.info("Region switch verified via #region-dropdown", country=country_code, text=new_text)
                 return True
         except Exception:
@@ -139,7 +145,7 @@ class KalodataNavigator:
         # 2. Verify via document title (e.g. 'Daftar Peringkat Kreator TikTok Shop Malaysia')
         try:
             page_title = (self.page.title() or "").lower()
-            if region_label.lower() in page_title:
+            if region_label.lower() in page_title or country_code.lower() in page_title:
                 logger.info("Region switch verified via page title", country=country_code, title=page_title)
                 return True
         except Exception:
