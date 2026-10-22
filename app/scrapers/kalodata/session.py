@@ -4,7 +4,7 @@ Follows rules in PRD §7.3, §7.4, and §7.5.
 """
 
 import time
-from typing import Tuple
+from typing import Tuple, Optional
 import structlog
 from playwright.sync_api import Page, TimeoutError as PlaywrightTimeoutError
 
