@@ -138,7 +138,10 @@ class BaseScraper:
             channel = "chrome"
 
         env = os.environ.copy()
-        if sys.platform != "win32" and settings.KALODATA_DISPLAY and not headless:
+        if headless:
+            env.pop("DISPLAY", None)
+            env.pop("WAYLAND_DISPLAY", None)
+        elif sys.platform != "win32" and settings.KALODATA_DISPLAY:
             env["DISPLAY"] = settings.KALODATA_DISPLAY
 
         self.playwright = sync_playwright().start()
@@ -149,6 +152,11 @@ class BaseScraper:
             "--disable-dev-shm-usage",
             "--disable-blink-features=AutomationControlled",
         ]
+        if headless:
+            args.extend([
+                "--headless=new",
+                "--disable-gpu",
+            ])
 
         logger.info(
             "Launching browser persistent context",
@@ -183,16 +191,32 @@ class BaseScraper:
                     ex = inner_ex
                     err_msg = str(inner_ex)
 
-            # Fallback 2: If headed launch failed (e.g. missing XServer or $DISPLAY), fallback automatically to headless
-            if self.browser_context is None and not kwargs.get("headless"):
+            # Fallback 2: Launch in pure headless without any DISPLAY
+            if self.browser_context is None:
                 logger.warning(
-                    "Headed browser launch failed (missing XServer or $DISPLAY). Falling back automatically to headless=True...",
+                    "Persistent context launch failed. Retrying with pure headless (no DISPLAY)...",
                     error=err_msg
                 )
-                kwargs["headless"] = True
-                kwargs.pop("channel", None)
+                attempt_env = os.environ.copy()
+                attempt_env.pop("DISPLAY", None)
+                attempt_env.pop("WAYLAND_DISPLAY", None)
+                pure_headless_kwargs = {
+                    "user_data_dir": str(self.profile_dir),
+                    "headless": True,
+                    "slow_mo": slow_mo,
+                    "args": [
+                        "--no-sandbox",
+                        "--disable-setuid-sandbox",
+                        "--disable-dev-shm-usage",
+                        "--disable-blink-features=AutomationControlled",
+                        "--headless=new",
+                        "--disable-gpu",
+                    ],
+                    "viewport": {"width": 1440, "height": 900},
+                    "env": attempt_env,
+                }
                 try:
-                    self.browser_context = self.playwright.chromium.launch_persistent_context(**kwargs)
+                    self.browser_context = self.playwright.chromium.launch_persistent_context(**pure_headless_kwargs)
                 except Exception as head_ex:
                     logger.error("Headless fallback also failed", error=str(head_ex))
                     raise head_ex

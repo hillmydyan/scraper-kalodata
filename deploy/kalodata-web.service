@@ -8,7 +8,6 @@ Type=simple
 User=root
 WorkingDirectory=/opt/kalodata
 EnvironmentFile=/opt/kalodata/.env
-Environment=DISPLAY=:1
 Environment=PYTHONPATH=/opt/kalodata
 ExecStart=/opt/kalodata/venv/bin/gunicorn --bind 0.0.0.0:8081 --workers 2 --timeout 180 "app:create_app()"
 Restart=always
