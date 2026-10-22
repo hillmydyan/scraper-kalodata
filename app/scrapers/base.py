@@ -24,8 +24,12 @@ class ScraperLockError(Exception):
 class BaseScraper:
     def __init__(self, profile_label: str = "default"):
         self.profile_label = profile_label
-        if profile_label in ("default", "indo", "main", "thailand") and settings.CHROME_USER_DATA_DIR and Path(settings.CHROME_USER_DATA_DIR).exists():
+        # Priority 1: Check configured CHROME_USER_DATA_DIR
+        if settings.CHROME_USER_DATA_DIR and Path(settings.CHROME_USER_DATA_DIR).exists():
             self.profile_dir = Path(settings.CHROME_USER_DATA_DIR).resolve()
+        # Priority 2: Check runtime/chrome_profile
+        elif (settings.RUNTIME_DIR / "chrome_profile").exists():
+            self.profile_dir = (settings.RUNTIME_DIR / "chrome_profile").resolve()
         else:
             self.profile_dir = settings.RUNTIME_DIR / "profiles" / "kalodata" / profile_label
         self.profile_dir.mkdir(parents=True, exist_ok=True)
@@ -166,7 +170,10 @@ class BaseScraper:
             display=env.get("DISPLAY")
         )
 
-        user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+        if sys.platform == "win32":
+            user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+        else:
+            user_agent = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
         kwargs = {
             "user_data_dir": str(self.profile_dir),
             "headless": headless,
