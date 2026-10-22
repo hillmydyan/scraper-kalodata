@@ -1,0 +1,15 @@
+[Unit]
+Description=Kalodata Virtual Xvfb Display and VNC Server
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/kalodata
+ExecStart=/bin/bash /opt/kalodata/deploy/start_vnc.sh
+Restart=always
+RestartSec=5
+TimeoutStopSec=15
+
+[Install]
+WantedBy=multi-user.target

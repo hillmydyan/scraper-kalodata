@@ -1,0 +1,282 @@
+{% extends "base.html" %}
+{% from "components/icons.html" import icon %}
+
+{% block title %}Jadwal & Trigger - Kurma Scraper{% endblock %}
+
+{% block content %}
+<div style="margin-bottom: 2rem;">
+  <h1 style="font-size: 1.5rem; font-weight: 800; color: var(--color-sidebar); display: flex; align-items: center; gap: 0.6rem;">
+    {{ icon('jobs', 26, stroke=2, color='var(--color-primary)') }}
+    <span>Jadwal Otomasi &amp; Trigger Scraping</span>
+  </h1>
+  <p style="color: var(--color-text-muted); font-size: 0.88rem; margin-top: 0.25rem;">
+    Atur jadwal otomatisasi harian Kalodata dan jalankan eksekusi scraper manual sewaktu-waktu.
+  </p>
+</div>
+
+<!-- Card 1: Pengaturan Jadwal Harian Kalodata -->
+<div class="card-kurma">
+  <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.25rem; border-bottom: 1px solid var(--color-border-subtle); padding-bottom: 1rem;">
+    <div>
+      <h2 class="card-title" style="margin-bottom: 0.2rem; display: flex; align-items: center; gap: 0.5rem;">
+        {{ icon('clock', 20, color='var(--color-primary)') }}
+        <span>Otomatisasi Harian Kalodata</span>
+      </h2>
+      <p style="color: var(--color-text-muted); font-size: 0.85rem; margin: 0;">
+        Menjadwalkan waktu kapan scraper Kalodata (<a href="https://www.kalodata.com" target="_blank" style="color: var(--color-primary); font-weight: 600; text-decoration: underline;">https://www.kalodata.com</a>) berjalan otomatis setiap hari.
+      </p>
+    </div>
+  </div>
+
+  <form method="POST" action="{{ url_for('jobs.save_schedule') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+
+    <div class="form-grid-3">
+      <div class="form-group">
+        <label class="form-label" for="schedule_time">Jam Eksekusi Harian (WIB)</label>
+        <div class="input-with-icon">
+          <input type="text" id="schedule_time" name="schedule_time" value="{{ schedule_config.time }}" class="form-input" placeholder="01:10 AM" required>
+          <span class="input-icon-right">
+            {{ icon('clock', 18, color='var(--color-text-muted)') }}
+          </span>
+        </div>
+        <div class="field-hint">Waktu server lokal. Saat ini: <strong>{{ schedule_config.current_time_wib }}</strong></div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Kriteria Scraping Otomatis</label>
+        <div style="background: #F8FAFC; border: 1px solid var(--color-border-subtle); border-radius: 6px; padding: 0.5rem 0.75rem; font-size: 0.82rem; color: var(--color-text);">
+          <div style="display: flex; align-items: center; gap: 0.35rem; color: var(--color-success); font-weight: 700; margin-bottom: 0.2rem;">
+            {{ icon('check', 14, stroke=2.5) }} Kreator: Pendapatan &ge; Rp4.000.000
+          </div>
+          <div style="display: flex; align-items: center; gap: 0.35rem; color: var(--color-success); font-weight: 700; margin-bottom: 0.15rem;">
+            {{ icon('check', 14, stroke=2.5) }} Produk: Penjualan &gt; 50 Terjual
+          </div>
+          <span style="color: var(--color-text-muted); font-size: 0.78rem;">Sistem otomatis menyaring data sesuai kriteria minimum.</span>
+        </div>
+        <input type="hidden" id="target_limit" name="target_limit" value="{{ schedule_config.target_limit or 2000 }}">
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="target_region">Target Region (Kalodata)</label>
+        <select id="target_region" name="target_region" class="form-select">
+          <option value="MY" {% if schedule_config.target_region == 'MY' %}selected{% endif %}>MY Malaysia (Kalodata MY)</option>
+          <option value="ID" {% if schedule_config.target_region == 'ID' %}selected{% endif %}>ID Indonesia (Kalodata ID)</option>
+          <option value="TH" {% if schedule_config.target_region == 'TH' %}selected{% endif %}>TH Thailand (Kalodata TH)</option>
+          <option value="ALL" {% if schedule_config.target_region == 'ALL' %}selected{% endif %}>Semua Region (ID &rarr; MY &rarr; TH)</option>
+        </select>
+        <div class="field-hint">Negara tujuan scraping harian di https://www.kalodata.com.</div>
+      </div>
+    </div>
+
+    <div class="switch-row">
+      <div>
+        <div class="switch-label-title">Aktifkan Penjadwalan Otomatis</div>
+        <div class="switch-label-desc">Jika dinyalakan, sistem otomatis mengeksekusi pipeline Kalodata pada jam yang ditentukan.</div>
+      </div>
+      <div>
+        <label class="toggle-switch">
+          <input type="checkbox" name="auto_schedule" {% if schedule_config.auto_schedule %}checked{% endif %}>
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
+    </div>
+
+    <div style="display: flex; justify-content: flex-end;">
+      <button type="submit" class="btn-kurma">
+        {{ icon('check', 16, stroke=2.5) }}
+        <span>Simpan Konfigurasi Jadwal</span>
+      </button>
+    </div>
+  </form>
+</div>
+
+<!-- Card 2: Trigger Manual Darurat (Kalodata Scraper) -->
+<div class="card-kurma-danger">
+  <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1.5rem;">
+    <div>
+      <div class="section-title-danger">
+        {{ icon('lightning', 22, color='#DC2626') }}
+        <span>Trigger Manual Langsung (Kalodata)</span>
+      </div>
+      <div class="section-desc-danger">
+        Jalankan penarikan data langsung ke https://www.kalodata.com sekarang juga secara on-demand tanpa menunggu jadwal.
+      </div>
+    </div>
+    <div class="icon-badge-red">
+      {{ icon('lightning', 20, color='#DC2626') }}
+    </div>
+  </div>
+
+  <form method="POST" action="{{ url_for('jobs.trigger_manual') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+
+    <!-- Row 1: Parameter Scraping -->
+    <div class="form-grid-3">
+      <div class="form-group">
+        <label class="form-label" for="manual_module">Modul Scraping Kalodata</label>
+        <select id="manual_module" name="module" class="form-select">
+          <option value="creator" {% if (manual_config or {}).get('module') == 'creator' %}selected{% endif %}>Menu Kreator (Kreator + 3 Produk Terlaris)</option>
+          <option value="product" {% if (manual_config or {}).get('module') == 'product' %}selected{% endif %}>Menu Produk (Katalog Produk Kalodata)</option>
+        </select>
+        <div class="field-hint">Pilih modul data yang ingin ditarik dari platform Kalodata.</div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="manual_level">Kategori Filter</label>
+        <select id="manual_level" name="scraping_level" class="form-select">
+          <option value="bawahan_wanita" selected>Bawahan Wanita (Pakaian &amp; Pakaian Dalam)</option>
+        </select>
+        <div class="field-hint">Kategori filter produk pada Kalodata.</div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="manual_country">Target Region (Kalodata)</label>
+        <select id="manual_country" name="country" class="form-select">
+          <option value="ID" {% if (manual_config or {}).get('country') == 'ID' %}selected{% endif %}>ID Indonesia (Kalodata ID)</option>
+          <option value="MY" {% if (manual_config or {}).get('country') == 'MY' %}selected{% endif %}>MY Malaysia (Kalodata MY)</option>
+          <option value="TH" {% if (manual_config or {}).get('country') == 'TH' %}selected{% endif %}>TH Thailand (Kalodata TH)</option>
+          <option value="ALL" {% if (manual_config or {}).get('country') == 'ALL' %}selected{% endif %}>Semua Region (ID &rarr; MY &rarr; TH)</option>
+        </select>
+        <div class="field-hint">Region target di https://www.kalodata.com.</div>
+      </div>
+    </div>
+
+    <!-- Row 2: Runtime & Limit -->
+    <div class="form-grid-3" style="margin-top: 0.5rem;">
+      <div class="form-group">
+        <label class="form-label" for="manual_limit">Batas Maksimal Baris (Trigger Manual)</label>
+        <input type="number" id="manual_limit" name="limit" value="{{ (manual_config or {}).get('limit') or 200 }}" min="1" max="2000" class="form-input" required>
+        <div class="field-hint">Batas baris khusus trigger manual. Filter aktif: Kreator &ge; Rp4 Juta &amp; Produk &gt; 50 Terjual.</div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="manual_period">Periode Data</label>
+        <input type="date" id="manual_period" name="period" value="{{ default_period }}" class="form-input" required>
+        <div class="field-hint">Default: data kemarin (H-1).</div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="manual_browser">Tampilan Browser (Lokal)</label>
+        <select id="manual_browser" name="headless" class="form-select">
+          <option value="false" {% if (manual_config or {}).get('headless') != 'true' %}selected{% endif %}>Google Chrome (Desktop Visible)</option>
+          <option value="true" {% if (manual_config or {}).get('headless') == 'true' %}selected{% endif %}>Headless (Latar Belakang)</option>
+        </select>
+        <div class="field-hint">Buka window Google Chrome langsung di layar komputer.</div>
+      </div>
+    </div>
+
+    <!-- Row 3: Action Button -->
+    <div style="margin-top: 1.25rem;">
+      <button type="submit" class="btn-kurma-danger" style="width: 100%; height: 46px; justify-content: center; font-size: 0.95rem;">
+        {{ icon('lightning', 18) }}
+        <span>Jalankan Scraper Kalodata Sekarang</span>
+      </button>
+    </div>
+  </form>
+</div>
+
+
+
+<!-- Card 3: Riwayat Job Scraping Terkini -->
+<div class="card-kurma">
+  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem;">
+    <h2 class="card-title" style="margin: 0; display: flex; align-items: center; gap: 0.5rem;">
+      {{ icon('server', 20, color='var(--color-primary)') }}
+      <span>Riwayat Job Scraping Terkini</span>
+    </h2>
+    <span style="font-size: 0.82rem; color: var(--color-text-muted);">
+      Menampilkan aktivitas pipeline terbaru
+    </span>
+  </div>
+
+  <div class="table-wrapper">
+    <table class="kurma-table">
+      <thead>
+        <tr>
+          <th>Negara</th>
+          <th>Periode</th>
+          <th>Status</th>
+          <th>Tahap</th>
+          <th>Ditemukan</th>
+          <th>Disimpan</th>
+          <th>Rejected</th>
+          <th>Waktu Mulai (WIB)</th>
+          <th>Aksi</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% if jobs %}
+          {% for j in jobs %}
+          <tr>
+            <td>
+              {% if j.country_code == 'ID' %}
+                <span class="country-badge" style="background:#FEE2E2; color:#DC2626;">ID</span>
+              {% elif j.country_code == 'MY' %}
+                <span class="country-badge" style="background:#DBEAFE; color:#2563EB;">MY</span>
+              {% elif j.country_code == 'TH' %}
+                <span class="country-badge" style="background:#FEF3C7; color:#D97706;">TH</span>
+              {% else %}
+                <span class="country-badge">{{ j.country_code }}</span>
+              {% endif %}
+            </td>
+            <td><strong>{{ j.period_start }}</strong></td>
+            <td><span class="status-pill status-{{ j.status }}">{{ j.status }}</span></td>
+            <td><span style="font-size: 0.82rem; color: var(--color-text-muted);">{{ j.stage }}</span></td>
+            <td>{{ j.rows_found }}</td>
+            <td><strong style="color: var(--color-success);">{{ j.rows_saved }}</strong></td>
+            <td>
+              {% if j.rows_rejected > 0 %}
+                <span style="color: var(--color-danger); font-weight: 700;">{{ j.rows_rejected }}</span>
+              {% else %}
+                <span style="color: var(--color-text-muted);">0</span>
+              {% endif %}
+            </td>
+            <td>{{ format_wib(j.started_at or j.created_at) }}</td>
+            <td>
+              <div style="display: flex; gap: 0.4rem; align-items: center;">
+                <a href="{{ url_for('jobs.detail', job_id=j.id) }}" class="btn-kurma-secondary" style="padding: 0.35rem 0.75rem; font-size: 0.82rem;">
+                  {{ icon('eye', 14) }}
+                  <span>Detail</span>
+                </a>
+                {% if j.status == 'RUNNING' and current_user.role == 'admin' %}
+                <form method="POST" action="{{ url_for('jobs.cancel', job_id=j.id) }}" style="display:inline;">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                  <button type="submit" class="btn-kurma-danger" style="padding: 0.35rem 0.75rem; font-size: 0.8rem;">Batal</button>
+                </form>
+                {% endif %}
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        {% else %}
+          <tr>
+            <td colspan="9" style="text-align: center; padding: 2.5rem; color: var(--color-text-muted);">
+              Belum ada riwayat job scraping di sistem.
+            </td>
+          </tr>
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% if jobs and jobs|selectattr("status", "in", ["RUNNING", "PENDING"])|list|length > 0 %}
+<div style="margin-top: 1.5rem; display: flex; align-items: center; gap: 0.75rem; background: var(--color-primary-soft); border: 1px solid var(--color-border); padding: 0.85rem 1.25rem; border-radius: var(--radius-md); color: var(--color-primary); font-size: 0.88rem; font-weight: 700;">
+  <span style="display: inline-block; width: 10px; height: 10px; background: var(--color-primary); border-radius: 50%; animation: pulse-green 1.5s infinite;"></span>
+  <span>Job scraping sedang berjalan di latar belakang... Halaman diperbarui otomatis setiap 5 detik.</span>
+</div>
+<script>
+  setTimeout(function() {
+    window.location.reload();
+  }, 5000);
+</script>
+<style>
+  @keyframes pulse-green {
+    0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
+    70% { transform: scale(1); box-shadow: 0 0 0 8px rgba(16, 185, 129, 0); }
+    100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+  }
+</style>
+{% endif %}
+{% endblock %}

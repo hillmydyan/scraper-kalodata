@@ -1,0 +1,163 @@
+{% extends "base.html" %}
+{% from "components/icons.html" import icon %}
+
+{% block title %}Hasil & Ekspor Berkas — Kurma Scraper{% endblock %}
+
+{% block content %}
+<div style="margin-bottom: 2rem;">
+  <h1 style="font-size: 1.65rem; font-weight: 800; color: var(--color-text); letter-spacing: -0.02em;">
+    Hasil &amp; Ekspor Berkas
+  </h1>
+  <p style="color: var(--color-text-muted); font-size: 0.92rem; margin-top: 0.25rem;">
+    Daftar File Hasil Ekspor Excel &bull; Pusat unduhan dan pratinjau laporan harian data scraping Kalodata.
+  </p>
+</div>
+
+<!-- Sub-Menu Navigation Tabs (Produk vs Kreator) -->
+<div style="display: flex; gap: 0.75rem; margin-bottom: 1.75rem; border-bottom: 1px solid var(--color-border); padding-bottom: 0.85rem;">
+  <a href="{{ url_for('results.index', module='product', country=selected_country or '', status=selected_status or '') }}" 
+     class="tab-pill {% if active_module == 'product' %}active{% endif %}">
+    {{ icon('product', 18) }}
+    <span>Hasil Produk</span>
+    <span class="tab-badge">{{ product_count }}</span>
+  </a>
+
+  <a href="{{ url_for('results.index', module='creator', country=selected_country or '', status=selected_status or '') }}" 
+     class="tab-pill {% if active_module == 'creator' %}active{% endif %}">
+    {{ icon('creator', 18) }}
+    <span>Hasil Kreator</span>
+    <span class="tab-badge">{{ creator_count }}</span>
+  </a>
+</div>
+
+<!-- Filters Bar -->
+<div class="card-kurma" style="margin-bottom: 1.75rem; padding: 1.25rem 1.75rem;">
+  <form method="GET" action="{{ url_for('results.index') }}" style="display: flex; gap: 1.25rem; align-items: flex-end; flex-wrap: wrap;">
+    <input type="hidden" name="module" value="{{ active_module }}"/>
+
+    <div style="min-width: 180px;">
+      <label class="form-label">Wilayah</label>
+      <select name="country" class="form-select">
+        <option value="">Semua Wilayah</option>
+        <option value="ID" {% if selected_country == 'ID' %}selected{% endif %}>ID — Indonesia</option>
+        <option value="MY" {% if selected_country == 'MY' %}selected{% endif %}>MY — Malaysia</option>
+        <option value="TH" {% if selected_country == 'TH' %}selected{% endif %}>TH — Thailand</option>
+      </select>
+    </div>
+
+    <div style="min-width: 180px;">
+      <label class="form-label">Status Ekspor</label>
+      <select name="status" class="form-select">
+        <option value="">Semua Status</option>
+        <option value="SUCCESS" {% if selected_status == 'SUCCESS' %}selected{% endif %}>SUCCESS</option>
+        <option value="PARTIAL" {% if selected_status == 'PARTIAL' %}selected{% endif %}>PARTIAL</option>
+        <option value="EMPTY" {% if selected_status == 'EMPTY' %}selected{% endif %}>EMPTY</option>
+      </select>
+    </div>
+
+    <div style="display: flex; gap: 0.5rem;">
+      <button type="submit" class="btn-kurma">
+        {{ icon('search', 16) }}
+        <span>Terapkan Filter</span>
+      </button>
+      <a href="{{ url_for('results.index', module=active_module) }}" class="btn-kurma-secondary">
+        Reset
+      </a>
+    </div>
+  </form>
+</div>
+
+<!-- Exports Table -->
+<div class="card-kurma">
+  <div class="section-header">
+    <div>
+      <h3 class="section-title">
+        {% if active_module == 'creator' %}
+          Daftar Berkas Excel Hasil Kreator
+        {% else %}
+          Daftar Berkas Excel Hasil Produk
+        {% endif %}
+      </h3>
+      <p style="font-size: 0.82rem; color: var(--color-text-muted); margin-top: 0.2rem;">
+        Klik tombol "Unduh Excel" untuk menyimpan laporan (.xlsx) ke komputer Anda.
+      </p>
+    </div>
+  </div>
+
+  <div class="table-wrapper">
+    <table class="kurma-table">
+      <thead>
+        <tr>
+          <th>Nama Berkas Excel</th>
+          <th>Wilayah</th>
+          <th>Periode Data</th>
+          <th>Jumlah Baris</th>
+          <th>Ukuran</th>
+          <th>Status</th>
+          <th>Waktu Dibuat (WIB)</th>
+          <th style="min-width: 190px;">Aksi</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% if export_files %}
+          {% for f in export_files %}
+          <tr>
+            <td>
+              <div style="display: flex; align-items: center; gap: 0.5rem;">
+                <span style="color: var(--color-primary);">{{ icon('results', 18) }}</span>
+                <div>
+                  <strong style="color: var(--color-text); font-size: 0.9rem;">{{ f.file_name }}</strong>
+                  {% if f.version > 1 %}
+                    <span class="status-pill status-PARTIAL" style="font-size: 0.68rem; margin-left: 0.35rem;">v{{ f.version }}</span>
+                  {% endif %}
+                </div>
+              </div>
+            </td>
+            <td>
+              <span class="country-badge">{{ f.country_code }}</span>
+            </td>
+            <td>{{ f.period_start }}</td>
+            <td><strong>{{ f.row_count }}</strong> baris</td>
+            <td style="color: var(--color-text-muted); font-size: 0.82rem;">{{ (f.size_bytes / 1024)|round(1) }} KB</td>
+            <td><span class="status-pill status-{{ f.status }}">{{ f.status }}</span></td>
+            <td style="font-size: 0.82rem;">{{ format_wib(f.created_at) }}</td>
+            <td>
+              <div style="display: flex; gap: 0.45rem; align-items: center;">
+                <a href="{{ url_for('results.download', file_id=f.id) }}" class="btn-kurma" style="padding: 0.4rem 0.85rem; font-size: 0.8rem;" title="Unduh berkas Excel langsung">
+                  {{ icon('download', 14) }}
+                  <span>Unduh Excel</span>
+                </a>
+                <a href="{{ url_for('results.preview', job_id=f.scrape_job_id) }}" class="btn-kurma-secondary" style="padding: 0.4rem 0.75rem; font-size: 0.8rem;" title="Pratinjau data di web">
+                  {{ icon('eye', 14) }}
+                  <span>Preview</span>
+                </a>
+                {% if current_user.role == 'admin' %}
+                <form method="POST" action="{{ url_for('results.reexport', job_id=f.scrape_job_id) }}" style="display:inline;">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                  <button type="submit" class="btn-kurma-secondary" style="padding: 0.4rem 0.65rem; font-size: 0.8rem;" title="Buat ulang Excel dari database">
+                    {{ icon('refresh', 14) }}
+                  </button>
+                </form>
+                {% endif %}
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        {% else %}
+          <tr>
+            <td colspan="8" style="text-align: center; padding: 3rem 1.5rem; color: var(--color-text-muted);">
+              <div style="display: flex; justify-content: center; margin-bottom: 0.75rem; color: var(--color-text-subtle);">
+                {{ icon('results', 38) }}
+              </div>
+              <div style="font-size: 1rem; font-weight: 700; color: var(--color-text);">Belum ada berkas hasil ekspor untuk kategori ini.</div>
+              <p style="font-size: 0.82rem; margin-top: 0.35rem;">
+                Berkas akan otomatis dibuat setiap kali proses scraping harian selesai.
+              </p>
+            </td>
+          </tr>
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

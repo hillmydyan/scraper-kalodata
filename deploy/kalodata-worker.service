@@ -1,0 +1,19 @@
+[Unit]
+Description=Kalodata Scraper Playwright Celery Worker
+After=network.target docker.service kalodata-vnc.service
+Wants=docker.service kalodata-vnc.service
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/kalodata
+EnvironmentFile=/opt/kalodata/.env
+Environment=DISPLAY=:1
+Environment=PYTHONPATH=/opt/kalodata
+ExecStart=/opt/kalodata/venv/bin/celery -A app.tasks.celery_app worker -c 1 -Q kalodata,celery --loglevel=INFO
+Restart=always
+RestartSec=10
+TimeoutStopSec=120
+
+[Install]
+WantedBy=multi-user.target

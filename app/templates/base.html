@@ -1,0 +1,176 @@
+{% from "components/icons.html" import icon %}
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}Kurma Scraper — Kalodata Intel{% endblock %}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Asap+Sharp:ital,wght@0,100..900;1,100..900&family=Cormorant+Garamond:ital,wght@0,300..700;1,300..700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+</head>
+<body>
+  {% if current_user.is_authenticated %}
+  <div class="app-layout">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <!-- Brand Header -->
+      <div class="brand-section">
+        <div class="brand-logo" title="Kurma Scraper Emblem">
+          {{ icon('logo', 24, stroke=1.9, color="#FFFFFF") }}
+        </div>
+        <div class="brand-text">
+          <h2>Kurma Scraper</h2>
+          <span>KALODATA INTEL</span>
+        </div>
+      </div>
+
+      <!-- Main Menu -->
+      <div class="menu-group-title">Menu Utama</div>
+      <ul class="menu-list">
+        <li>
+          <a href="{{ url_for('dashboard.index') }}" class="menu-link {% if request.blueprint == 'dashboard' %}active{% endif %}">
+            {{ icon('dashboard', 19) }}
+            <span>Dashboard</span>
+          </a>
+        </li>
+        <li>
+          <a href="{{ url_for('results.index') }}" class="menu-link {% if request.blueprint == 'results' %}active{% endif %}">
+            {{ icon('results', 19) }}
+            <span>Hasil &amp; Ekspor</span>
+          </a>
+          {% if request.blueprint == 'results' %}
+          <div style="margin-left: 2rem; margin-top: 0.25rem; margin-bottom: 0.35rem; display: flex; flex-direction: column; gap: 0.2rem;">
+            <a href="{{ url_for('results.index', module='product') }}" style="font-size: 0.78rem; padding: 0.35rem 0.65rem; border-radius: 6px; color: {% if active_module != 'creator' %}#FFFFFF{% else %}rgba(255,255,255,0.65){% endif %}; background: {% if active_module != 'creator' %}rgba(255,255,255,0.1){% else %}transparent{% endif %}; font-weight: {% if active_module != 'creator' %}700{% else %}500{% endif %}; text-decoration: none; display: flex; align-items: center; gap: 0.45rem;">
+              {{ icon('product', 14, stroke=1.7) }}
+              <span>Hasil Produk</span>
+            </a>
+            <a href="{{ url_for('results.index', module='creator') }}" style="font-size: 0.78rem; padding: 0.35rem 0.65rem; border-radius: 6px; color: {% if active_module == 'creator' %}#FFFFFF{% else %}rgba(255,255,255,0.65){% endif %}; background: {% if active_module == 'creator' %}rgba(255,255,255,0.1){% else %}transparent{% endif %}; font-weight: {% if active_module == 'creator' %}700{% else %}500{% endif %}; text-decoration: none; display: flex; align-items: center; gap: 0.45rem;">
+              {{ icon('creator', 14, stroke=1.7) }}
+              <span>Hasil Kreator</span>
+            </a>
+          </div>
+          {% endif %}
+        </li>
+        <li>
+          <a href="{{ url_for('analytics.index') }}" class="menu-link {% if request.blueprint == 'analytics' %}active{% endif %}">
+            {{ icon('analytics', 19) }}
+            <span>Smart Analytics</span>
+            <span style="margin-left: auto; background: var(--color-accent-emerald); color: #073B32; font-size: 0.65rem; font-weight: 800; padding: 2px 6px; border-radius: 9999px;">AI</span>
+          </a>
+        </li>
+      </ul>
+
+      <!-- Admin Tools -->
+      <div class="menu-group-title">Alat Admin</div>
+      <ul class="menu-list">
+        <li>
+          <a href="{{ url_for('jobs.index') }}" class="menu-link {% if request.blueprint == 'jobs' %}active{% endif %}">
+            {{ icon('jobs', 19) }}
+            <span>Jadwal &amp; Trigger</span>
+          </a>
+        </li>
+        {% if current_user.role == 'admin' %}
+        <li>
+          <a href="{{ url_for('accounts.index') }}" class="menu-link {% if request.blueprint == 'accounts' %}active{% endif %}">
+            {{ icon('accounts', 19) }}
+            <span>Akun &amp; Sesi</span>
+          </a>
+        </li>
+        {% endif %}
+      </ul>
+
+      <!-- User Profile Card -->
+      <div class="sidebar-footer">
+        <div class="user-card">
+          <div class="user-info">
+            <div class="user-avatar">{{ current_user.username[:2]|upper }}</div>
+            <div class="user-details">
+              <h4>{{ current_user.username }}</h4>
+              <span>{{ 'Administrator' if current_user.role == 'admin' else 'Operator' }}</span>
+            </div>
+          </div>
+          <a href="{{ url_for('auth.logout') }}" class="logout-btn" title="Keluar dari Aplikasi" aria-label="Keluar">
+            {{ icon('logout', 18) }}
+          </a>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main Content Wrapper -->
+    <div class="main-wrapper">
+      <!-- Top Navigation Bar -->
+      <header class="topbar">
+        <div class="topbar-left">
+          <div class="system-status-indicator">
+            <span class="pulse-dot"></span>
+            <span>SISTEM ONLINE</span>
+          </div>
+          <div class="live-clock-badge">
+            {{ icon('clock', 15) }}
+            <span id="liveClockWIB">Memuat waktu...</span>
+          </div>
+        </div>
+        <div class="topbar-right">
+          <span style="font-size: 0.82rem; color: var(--color-text-muted);">
+            Masuk sebagai: <strong style="color: var(--color-text);">{{ current_user.username }}</strong>
+          </span>
+        </div>
+      </header>
+
+      <!-- Main Body Content -->
+      <main class="content-container">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+          {% if messages %}
+            <div class="flash-messages">
+              {% for category, message in messages %}
+                <div class="alert alert-{{ category }}">
+                  <span>{{ message }}</span>
+                </div>
+              {% endfor %}
+            </div>
+          {% endif %}
+        {% endwith %}
+
+        {% block content %}{% endblock %}
+      </main>
+    </div>
+  </div>
+
+  <script>
+    // Live WIB Clock
+    function updateWibClock() {
+      const now = new Date();
+      // Format to WIB (UTC+7)
+      const options = {
+        timeZone: 'Asia/Jakarta',
+        weekday: 'short',
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false
+      };
+      try {
+        const formatter = new Intl.DateTimeFormat('id-ID', options);
+        const clockEl = document.getElementById('liveClockWIB');
+        if (clockEl) {
+          clockEl.textContent = formatter.format(now) + ' WIB';
+        }
+      } catch(e) {}
+    }
+    updateWibClock();
+    setInterval(updateWibClock, 1000);
+  </script>
+
+  {% else %}
+  <!-- Auth Screen Layout -->
+  <main style="width: 100%; display: flex; align-items: center; justify-content: center; min-height: 100vh; background-color: var(--color-background);">
+    {% block auth_content %}{% endblock %}
+  </main>
+  {% endif %}
+</body>
+</html>

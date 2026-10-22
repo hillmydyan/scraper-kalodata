@@ -1,0 +1,631 @@
+{% extends "base.html" %}
+{% from "components/icons.html" import icon %}
+
+{% block title %}Smart Analytics — Kurma Scraper{% endblock %}
+
+{% block content %}
+<!-- Page Header -->
+<div style="margin-bottom: 2rem; display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: 1rem;">
+  <div>
+    <div style="display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.25rem;">
+      <h1 style="font-size: 1.7rem; font-weight: 800; color: var(--color-text); letter-spacing: -0.02em;">
+        Auto-Analisis Komisi &amp; Revenue
+      </h1>
+      <span style="background: var(--color-primary-soft); color: var(--color-primary); font-size: 0.72rem; font-weight: 800; padding: 0.2rem 0.65rem; border-radius: var(--radius-full); border: 1px solid var(--color-border);">
+        Smart Intel AI
+      </span>
+    </div>
+    <p style="color: var(--color-text-muted); font-size: 0.92rem; max-width: 720px; line-height: 1.5;">
+      Sistem membedah data produk &amp; kreator ke dalam 3 tingkatan: <strong>Komisi Rendah</strong> (&le; 7%), <strong>Komisi Sedang</strong> (8% - 10%), dan <strong>Komisi Tinggi</strong> (&ge; 11%) terhadap perolehan Revenue.
+    </p>
+  </div>
+  <div style="display: flex; gap: 0.75rem;">
+    <a href="{{ url_for('analytics.export_excel', country=selected_country, module=selected_module, max_comm=selected_max_comm, min_rev=selected_min_rev, tier=selected_tier, sort=selected_sort, q=search_q) }}" class="btn-kurma">
+      {{ icon('download', 16) }}
+      <span>Ekspor Rekomendasi Excel</span>
+    </a>
+  </div>
+</div>
+
+<!-- KPI Cards -->
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1.25rem; margin-bottom: 2rem;">
+  <!-- Card 1: Komisi Rendah -->
+  <div class="card-kurma" style="border-left: 4px solid var(--color-success); margin-bottom: 0;">
+    <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+      <div>
+        <span style="font-size: 0.72rem; font-weight: 800; color: var(--color-success); text-transform: uppercase; letter-spacing: 0.05em;">
+          Komisi Rendah Terdeteksi
+        </span>
+        <div style="font-size: 2rem; font-weight: 800; color: var(--color-text); margin-top: 0.25rem; line-height: 1.1;">
+          {{ kpis.low_comm_count }}
+          <span style="font-size: 0.9rem; font-weight: 600; color: var(--color-text-muted);">/ {{ kpis.total_items }}</span>
+        </div>
+      </div>
+      <div style="width: 38px; height: 38px; border-radius: var(--radius-sm); background: var(--color-success-bg); color: var(--color-success); display: flex; align-items: center; justify-content: center;">
+        {{ icon('check', 18, stroke=2) }}
+      </div>
+    </div>
+    <p style="font-size: 0.78rem; color: var(--color-text-muted); margin-top: 0.75rem;">
+      Komisi &le; <strong>7%</strong> (Margin tebal penjual)
+    </p>
+  </div>
+
+  <!-- Card 2: Rata-rata Komisi Pasar -->
+  <div class="card-kurma" style="border-left: 4px solid var(--color-info); margin-bottom: 0;">
+    <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+      <div>
+        <span style="font-size: 0.72rem; font-weight: 800; color: var(--color-info); text-transform: uppercase; letter-spacing: 0.05em;">
+          Rata-rata Komisi Pasar
+        </span>
+        <div style="font-size: 2rem; font-weight: 800; color: var(--color-text); margin-top: 0.25rem; line-height: 1.1;">
+          {{ kpis.avg_commission }}%
+        </div>
+      </div>
+      <div style="width: 38px; height: 38px; border-radius: var(--radius-sm); background: var(--color-info-bg); color: var(--color-info); display: flex; align-items: center; justify-content: center;">
+        {{ icon('results', 18, stroke=2) }}
+      </div>
+    </div>
+    <p style="font-size: 0.78rem; color: var(--color-text-muted); margin-top: 0.75rem;">
+      Benchmark potongan affiliasi
+    </p>
+  </div>
+
+  <!-- Card 3: Total Revenue Terdata -->
+  <div class="card-kurma" style="border-left: 4px solid var(--color-primary); margin-bottom: 0;">
+    <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+      <div>
+        <span style="font-size: 0.72rem; font-weight: 800; color: var(--color-primary); text-transform: uppercase; letter-spacing: 0.05em;">
+          Revenue Tertinggi
+        </span>
+        <div style="font-size: 1.8rem; font-weight: 800; color: var(--color-text); margin-top: 0.25rem; line-height: 1.2;">
+          Rp {{ "{:,.0f}".format(kpis.max_revenue / 1000000) }} Jt
+        </div>
+      </div>
+      <div style="width: 38px; height: 38px; border-radius: var(--radius-sm); background: var(--color-primary-soft); color: var(--color-primary); display: flex; align-items: center; justify-content: center;">
+        {{ icon('lightning', 18, stroke=2) }}
+      </div>
+    </div>
+    <p style="font-size: 0.78rem; color: var(--color-text-muted); margin-top: 0.75rem;">
+      Total GMV: Rp {{ "{:,.0f}".format(kpis.total_revenue_sum / 1000000) }} Juta
+    </p>
+  </div>
+
+  <!-- Card 4: Penjualan Produk -->
+  <div class="card-kurma" style="border-left: 4px solid var(--color-warning); margin-bottom: 0;">
+    <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+      <div>
+        <span style="font-size: 0.72rem; font-weight: 800; color: var(--color-warning); text-transform: uppercase; letter-spacing: 0.05em;">
+          Penjualan Tertinggi
+        </span>
+        <div style="font-size: 2rem; font-weight: 800; color: var(--color-text); margin-top: 0.25rem; line-height: 1.1;">
+          {{ "{:,.0f}".format(kpis.max_sales) }}
+          <span style="font-size: 0.85rem; font-weight: 600; color: var(--color-text-muted);">pcs</span>
+        </div>
+      </div>
+      <div style="width: 38px; height: 38px; border-radius: var(--radius-sm); background: var(--color-warning-bg); color: var(--color-warning); display: flex; align-items: center; justify-content: center;">
+        {{ icon('product', 18, stroke=2) }}
+      </div>
+    </div>
+    <p style="font-size: 0.78rem; color: var(--color-text-muted); margin-top: 0.75rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 200px;" title="{{ kpis.top_selling_item.product_name if kpis.top_selling_item else '-' }}">
+      {{ kpis.top_selling_item.product_name if kpis.top_selling_item else '-' }}
+    </p>
+  </div>
+</div>
+
+<!-- Filter Bar -->
+<div class="card-kurma" style="margin-bottom: 2rem; padding: 1.25rem 1.75rem;">
+  <form method="GET" action="{{ url_for('analytics.index') }}" style="display: flex; flex-direction: column; gap: 1rem;">
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; align-items: flex-end;">
+      <!-- Negara -->
+      <div>
+        <label class="form-label">Wilayah</label>
+        <select name="country" class="form-select">
+          <option value="" {% if not selected_country %}selected{% endif %}>Semua Wilayah</option>
+          <option value="ID" {% if selected_country == 'ID' %}selected{% endif %}>ID — Indonesia</option>
+          <option value="MY" {% if selected_country == 'MY' %}selected{% endif %}>MY — Malaysia</option>
+          <option value="TH" {% if selected_country == 'TH' %}selected{% endif %}>TH — Thailand</option>
+        </select>
+      </div>
+
+      <!-- Modul -->
+      <div>
+        <label class="form-label">Sumber Data</label>
+        <select name="module" class="form-select">
+          <option value="all" {% if selected_module == 'all' %}selected{% endif %}>Semua Modul</option>
+          <option value="creator" {% if selected_module == 'creator' %}selected{% endif %}>Kreator (TikTok Shop)</option>
+          <option value="product" {% if selected_module == 'product' %}selected{% endif %}>Produk Kalodata</option>
+        </select>
+      </div>
+
+      <!-- Filter Kategori Komisi -->
+      <div>
+        <label class="form-label">Kategori Komisi</label>
+        <select name="tier" class="form-select">
+          <option value="ALL" {% if selected_tier == 'ALL' %}selected{% endif %}>Semua Kategori</option>
+          <option value="LOW_COMM" {% if selected_tier == 'LOW_COMM' %}selected{% endif %}>Komisi Rendah (&le; 7%)</option>
+          <option value="MID_COMM" {% if selected_tier == 'MID_COMM' %}selected{% endif %}>Komisi Sedang (8% - 10%)</option>
+          <option value="HIGH_COMM" {% if selected_tier == 'HIGH_COMM' %}selected{% endif %}>Komisi Tinggi (&ge; 11%)</option>
+        </select>
+      </div>
+
+      <!-- Urutan & Prioritas Filter -->
+      <div>
+        <label class="form-label">Urutkan &amp; Prioritas</label>
+        <select name="sort" class="form-select">
+          <optgroup label="Kombinasi Revenue &amp; Komisi">
+            <option value="rev_low_comm" {% if selected_sort == 'rev_low_comm' %}selected{% endif %}>Revenue Tertinggi + Komisi Rendah (&le; 7%)</option>
+            <option value="rev_mid_comm" {% if selected_sort == 'rev_mid_comm' %}selected{% endif %}>Revenue Tertinggi + Komisi Sedang (8% - 10%)</option>
+            <option value="rev_high_comm" {% if selected_sort == 'rev_high_comm' %}selected{% endif %}>Revenue Tertinggi + Komisi Tinggi (&ge; 11%)</option>
+          </optgroup>
+          <optgroup label="Urutan Standar">
+            <option value="revenue" {% if selected_sort == 'revenue' %}selected{% endif %}>Revenue Tertinggi (Semua GMV)</option>
+            <option value="sales" {% if selected_sort == 'sales' %}selected{% endif %}>Penjualan Terbanyak (Pcs)</option>
+            <option value="commission_asc" {% if selected_sort == 'commission_asc' %}selected{% endif %}>Komisi Terendah (%)</option>
+            <option value="commission_desc" {% if selected_sort == 'commission_desc' %}selected{% endif %}>Komisi Tertinggi (%)</option>
+          </optgroup>
+        </select>
+      </div>
+    </div>
+
+    <!-- Search input & Submit -->
+    <div style="display: flex; gap: 0.75rem; align-items: center; border-top: 1px solid var(--color-border-subtle); padding-top: 0.85rem;">
+      <div style="flex: 1; position: relative;">
+        <input type="text" name="q" value="{{ search_q }}" placeholder="Cari nama produk, toko, kreator, atau ID..." class="form-input" style="padding-left: 2.2rem;">
+        <span style="position: absolute; left: 0.75rem; top: 50%; transform: translateY(-50%); color: var(--color-text-muted);">
+          {{ icon('search', 16) }}
+        </span>
+      </div>
+      <button type="submit" class="btn-kurma">
+        {{ icon('search', 16) }}
+        <span>Terapkan Filter</span>
+      </button>
+      <a href="{{ url_for('analytics.index') }}" class="btn-kurma-secondary">
+        Reset
+      </a>
+    </div>
+  </form>
+</div>
+
+<!-- Visual Matrix (Scatter Chart) -->
+<div class="card-kurma" style="margin-bottom: 2rem;">
+  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; border-bottom: 1px solid var(--color-border-subtle); padding-bottom: 0.75rem;">
+    <div>
+      <h3 class="section-title">
+        Peta Sebaran: Revenue vs. Komisi (Matrix Efisiensi)
+      </h3>
+      <p style="font-size: 0.8rem; color: var(--color-text-muted); margin-top: 0.15rem;">
+        Semakin ke <strong>kiri-atas</strong>, semakin ideal produk tersebut (Revenue Tinggi + Komisi Rendah).
+      </p>
+    </div>
+    <div style="display: flex; gap: 1.25rem; font-size: 0.78rem; font-weight: 700;">
+      <span style="display: flex; align-items: center; gap: 0.4rem; color: var(--color-success);">
+        <span style="width: 8px; height: 8px; border-radius: 50%; background: var(--color-success); display: inline-block;"></span> Komisi Rendah (&le; 7%)
+      </span>
+      <span style="display: flex; align-items: center; gap: 0.4rem; color: var(--color-info);">
+        <span style="width: 8px; height: 8px; border-radius: 50%; background: var(--color-info); display: inline-block;"></span> Komisi Sedang (8% - 10%)
+      </span>
+      <span style="display: flex; align-items: center; gap: 0.4rem; color: var(--color-danger);">
+        <span style="width: 8px; height: 8px; border-radius: 50%; background: var(--color-danger); display: inline-block;"></span> Komisi Tinggi (&ge; 11%)
+      </span>
+    </div>
+  </div>
+  <div style="position: relative; height: 260px; width: 100%;">
+    <canvas id="matrixChart"></canvas>
+  </div>
+</div>
+
+<!-- Showcase 3 Produk Juara Revenue per Kategori Komisi -->
+<div style="margin-bottom: 2rem;">
+  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+    <div>
+      <h3 class="section-title">
+        1 Produk Revenue / GMV Tertinggi per Tingkat Komisi
+      </h3>
+      <p style="font-size: 0.82rem; color: var(--color-text-muted); margin-top: 0.2rem;">
+        Rangkuman produk juara dengan omset terbesar di masing-masing kategori komisi:
+      </p>
+    </div>
+  </div>
+
+  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(310px, 1fr)); gap: 1.25rem;">
+    <!-- Juara 1: Komisi Rendah -->
+    <div class="card-kurma" style="border-top: 4px solid var(--color-success); background: #F0FDF4; margin-bottom: 0;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+        <span class="status-pill status-SUCCESS">
+          Komisi Rendah (&le; 7%)
+        </span>
+        <span style="font-size: 0.82rem; font-weight: 800; color: var(--color-success);">#1 Top GMV</span>
+      </div>
+
+      {% if kpis.champion_low %}
+        <h4 style="font-size: 0.95rem; font-weight: 800; color: #14532D; line-height: 1.35; margin-bottom: 0.35rem; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;" title="{{ kpis.champion_low.product_name }}">
+          {{ kpis.champion_low.product_name }}
+        </h4>
+        <div style="font-size: 0.78rem; color: #166534; margin-bottom: 0.75rem;">
+          Toko: <strong>{{ kpis.champion_low.shop_name or '-' }}</strong>
+        </div>
+
+        <div style="background: #FFFFFF; border: 1px solid var(--color-success-border); border-radius: var(--radius-sm); padding: 0.75rem 0.9rem; margin-bottom: 0.85rem; display: flex; justify-content: space-between; align-items: center;">
+          <div>
+            <div style="font-size: 0.7rem; color: var(--color-text-muted); text-transform: uppercase; font-weight: 700;">Revenue (GMV)</div>
+            <div style="font-size: 1.15rem; font-weight: 800; color: var(--color-success);">
+              Rp {{ "{:,.0f}".format(kpis.champion_low.revenue_value) }}
+            </div>
+          </div>
+          <div style="text-align: right;">
+            <div style="font-size: 0.7rem; color: var(--color-text-muted); text-transform: uppercase; font-weight: 700;">Komisi Asli</div>
+            <div style="font-size: 1.1rem; font-weight: 800; color: var(--color-success);">
+              {{ kpis.champion_low.commission_pct }}%
+            </div>
+          </div>
+        </div>
+
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <span style="font-size: 0.8rem; color: var(--color-text-muted);">
+            Terjual: <strong style="color: var(--color-text);">{{ "{:,.0f}".format(kpis.champion_low.sales_value) }} pcs</strong>
+          </span>
+          <a href="{{ url_for('analytics.index', country=selected_country, module=selected_module, sort='rev_low_comm') }}" style="font-size: 0.82rem; font-weight: 700; color: var(--color-success); text-decoration: none; display: inline-flex; align-items: center; gap: 0.3rem;">
+            <span>Lihat Semua</span>
+            {{ icon('arrow-right', 13) }}
+          </a>
+        </div>
+      {% else %}
+        <p style="padding: 1.5rem 0; text-align: center; color: var(--color-text-muted); font-size: 0.82rem;">
+          Belum ada produk terdata di kategori ini.
+        </p>
+      {% endif %}
+    </div>
+
+    <!-- Juara 2: Komisi Sedang -->
+    <div class="card-kurma" style="border-top: 4px solid var(--color-info); background: #F0F9FF; margin-bottom: 0;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+        <span class="status-pill status-RUNNING">
+          Komisi Sedang (8% - 10%)
+        </span>
+        <span style="font-size: 0.82rem; font-weight: 800; color: var(--color-info);">#1 Top GMV</span>
+      </div>
+
+      {% if kpis.champion_mid %}
+        <h4 style="font-size: 0.95rem; font-weight: 800; color: #0C4A6E; line-height: 1.35; margin-bottom: 0.35rem; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;" title="{{ kpis.champion_mid.product_name }}">
+          {{ kpis.champion_mid.product_name }}
+        </h4>
+        <div style="font-size: 0.78rem; color: #0369A1; margin-bottom: 0.75rem;">
+          Toko: <strong>{{ kpis.champion_mid.shop_name or '-' }}</strong>
+        </div>
+
+        <div style="background: #FFFFFF; border: 1px solid var(--color-info-border); border-radius: var(--radius-sm); padding: 0.75rem 0.9rem; margin-bottom: 0.85rem; display: flex; justify-content: space-between; align-items: center;">
+          <div>
+            <div style="font-size: 0.7rem; color: var(--color-text-muted); text-transform: uppercase; font-weight: 700;">Revenue (GMV)</div>
+            <div style="font-size: 1.15rem; font-weight: 800; color: var(--color-info);">
+              Rp {{ "{:,.0f}".format(kpis.champion_mid.revenue_value) }}
+            </div>
+          </div>
+          <div style="text-align: right;">
+            <div style="font-size: 0.7rem; color: var(--color-text-muted); text-transform: uppercase; font-weight: 700;">Komisi Asli</div>
+            <div style="font-size: 1.1rem; font-weight: 800; color: var(--color-info);">
+              {{ kpis.champion_mid.commission_pct }}%
+            </div>
+          </div>
+        </div>
+
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <span style="font-size: 0.8rem; color: var(--color-text-muted);">
+            Terjual: <strong style="color: var(--color-text);">{{ "{:,.0f}".format(kpis.champion_mid.sales_value) }} pcs</strong>
+          </span>
+          <a href="{{ url_for('analytics.index', country=selected_country, module=selected_module, sort='rev_mid_comm') }}" style="font-size: 0.82rem; font-weight: 700; color: var(--color-info); text-decoration: none; display: inline-flex; align-items: center; gap: 0.3rem;">
+            <span>Lihat Semua</span>
+            {{ icon('arrow-right', 13) }}
+          </a>
+        </div>
+      {% else %}
+        <p style="padding: 1.5rem 0; text-align: center; color: var(--color-text-muted); font-size: 0.82rem;">
+          Belum ada produk terdata di kategori ini.
+        </p>
+      {% endif %}
+    </div>
+
+    <!-- Juara 3: Komisi Tinggi -->
+    <div class="card-kurma" style="border-top: 4px solid var(--color-danger); background: #FEF2F2; margin-bottom: 0;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+        <span class="status-pill status-FAILED">
+          Komisi Tinggi (&ge; 11%)
+        </span>
+        <span style="font-size: 0.82rem; font-weight: 800; color: var(--color-danger);">#1 Top GMV</span>
+      </div>
+
+      {% if kpis.champion_high %}
+        <h4 style="font-size: 0.95rem; font-weight: 800; color: #7F1D1D; line-height: 1.35; margin-bottom: 0.35rem; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;" title="{{ kpis.champion_high.product_name }}">
+          {{ kpis.champion_high.product_name }}
+        </h4>
+        <div style="font-size: 0.78rem; color: #B91C1C; margin-bottom: 0.75rem;">
+          Toko: <strong>{{ kpis.champion_high.shop_name or '-' }}</strong>
+        </div>
+
+        <div style="background: #FFFFFF; border: 1px solid var(--color-danger-border); border-radius: var(--radius-sm); padding: 0.75rem 0.9rem; margin-bottom: 0.85rem; display: flex; justify-content: space-between; align-items: center;">
+          <div>
+            <div style="font-size: 0.7rem; color: var(--color-text-muted); text-transform: uppercase; font-weight: 700;">Revenue (GMV)</div>
+            <div style="font-size: 1.15rem; font-weight: 800; color: var(--color-danger);">
+              Rp {{ "{:,.0f}".format(kpis.champion_high.revenue_value) }}
+            </div>
+          </div>
+          <div style="text-align: right;">
+            <div style="font-size: 0.7rem; color: var(--color-text-muted); text-transform: uppercase; font-weight: 700;">Komisi Asli</div>
+            <div style="font-size: 1.1rem; font-weight: 800; color: var(--color-danger);">
+              {{ kpis.champion_high.commission_pct }}%
+            </div>
+          </div>
+        </div>
+
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <span style="font-size: 0.8rem; color: var(--color-text-muted);">
+            Terjual: <strong style="color: var(--color-text);">{{ "{:,.0f}".format(kpis.champion_high.sales_value) }} pcs</strong>
+          </span>
+          <a href="{{ url_for('analytics.index', country=selected_country, module=selected_module, sort='rev_high_comm') }}" style="font-size: 0.82rem; font-weight: 700; color: var(--color-danger); text-decoration: none; display: inline-flex; align-items: center; gap: 0.3rem;">
+            <span>Lihat Semua</span>
+            {{ icon('arrow-right', 13) }}
+          </a>
+        </div>
+      {% else %}
+        <div style="padding: 1.25rem 0.5rem; text-align: center; color: var(--color-text-muted);">
+          <div style="font-size: 0.85rem; font-weight: 700; color: var(--color-text);">Belum ada produk &ge; 11%</div>
+          <p style="font-size: 0.75rem; margin-top: 0.25rem; line-height: 1.4;">
+            Data hasil scraping saat ini berada di rentang komisi 2% - 10%. Produk komisi &ge; 11% akan otomatis muncul jika terdeteksi.
+          </p>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<!-- Main Table of Opportunities -->
+<div class="card-kurma">
+  <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; margin-bottom: 1.25rem;">
+    <div>
+      <h3 class="section-title">
+        Daftar Produk &amp; Kreator Berdasarkan Komisi
+      </h3>
+      <p style="font-size: 0.82rem; color: var(--color-text-muted); margin-top: 0.2rem;">
+        Menampilkan <strong>{{ items|length }}</strong> data hasil analisis otomatis
+      </p>
+    </div>
+
+    <!-- Quick Filter Preset Pills -->
+    <div style="display: flex; gap: 0.4rem; flex-wrap: wrap; align-items: center;">
+      <span style="font-size: 0.75rem; font-weight: 700; color: var(--color-text-muted); margin-right: 0.2rem;">Preset:</span>
+      <a href="{{ url_for('analytics.index', country=selected_country, module=selected_module, sort='revenue') }}" 
+         class="quick-pill {% if selected_sort == 'revenue' %}active{% endif %}">
+        Semua GMV Tertinggi
+      </a>
+      <a href="{{ url_for('analytics.index', country=selected_country, module=selected_module, sort='rev_low_comm') }}" 
+         class="quick-pill {% if selected_sort == 'rev_low_comm' %}active{% endif %}" style="{% if selected_sort == 'rev_low_comm' %}background: var(--color-success); border-color: var(--color-success); color: #fff;{% endif %}">
+        Top GMV + Komisi Rendah (&le; 7%)
+      </a>
+      <a href="{{ url_for('analytics.index', country=selected_country, module=selected_module, sort='rev_mid_comm') }}" 
+         class="quick-pill {% if selected_sort == 'rev_mid_comm' %}active{% endif %}" style="{% if selected_sort == 'rev_mid_comm' %}background: var(--color-info); border-color: var(--color-info); color: #fff;{% endif %}">
+        Top GMV + Komisi Sedang (8% - 10%)
+      </a>
+      <a href="{{ url_for('analytics.index', country=selected_country, module=selected_module, sort='rev_high_comm') }}" 
+         class="quick-pill {% if selected_sort == 'rev_high_comm' %}active{% endif %}" style="{% if selected_sort == 'rev_high_comm' %}background: var(--color-danger); border-color: var(--color-danger); color: #fff;{% endif %}">
+        Top GMV + Komisi Tinggi (&ge; 11%)
+      </a>
+    </div>
+  </div>
+
+  <div class="table-wrapper">
+    <table class="kurma-table">
+      <thead>
+        <tr>
+          <th style="width: 45px; text-align: center;">#</th>
+          <th style="width: 175px;">Tingkat Komisi (%)</th>
+          <th style="width: 130px; text-align: center;">Jumlah Terjual</th>
+          <th>Nama Produk &amp; Toko</th>
+          <th>Kreator / Sumber</th>
+          <th>Revenue (GMV)</th>
+          <th style="text-align: center;">Aksi</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% if items %}
+          {% for r in items %}
+          <tr style="{% if r.tier == 'LOW_COMM' %}background-color: #F8FCF9;{% endif %}">
+            <!-- Rank -->
+            <td style="text-align: center; font-weight: 700; color: var(--color-text-muted); font-size: 0.8rem;">
+              {{ loop.index }}
+            </td>
+
+            <!-- Tingkat Komisi -->
+            <td style="white-space: nowrap;">
+              {% if r.commission_pct is not none %}
+                <div style="display: flex; align-items: center; gap: 0.45rem;">
+                  <span style="font-size: 1rem; font-weight: 800; {% if r.commission_pct <= 7 %}color: var(--color-success);{% elif r.commission_pct <= 10 %}color: var(--color-info);{% else %}color: var(--color-danger);{% endif %}">
+                    {{ r.commission_raw or ("{:.1f}%".format(r.commission_pct)) }}
+                  </span>
+                  <span class="status-pill {{ r.tier_badge }}" style="font-size: 0.65rem; padding: 0.15rem 0.45rem;">
+                    {{ r.tier_label }}
+                  </span>
+                </div>
+                <div style="width: 80px; height: 4px; background: var(--color-border); border-radius: 2px; overflow: hidden; margin-top: 0.3rem;">
+                  <div style="height: 100%; width: {{ [r.commission_pct * 5, 100]|min }}%; {% if r.commission_pct <= 7 %}background: var(--color-success);{% elif r.commission_pct <= 10 %}background: var(--color-info);{% else %}background: var(--color-danger);{% endif %}"></div>
+                </div>
+              {% else %}
+                <span class="status-pill status-NO_DATA" style="font-size: 0.68rem;">Data Masked</span>
+              {% endif %}
+            </td>
+
+            <!-- Sales Qty -->
+            <td style="text-align: center;">
+              {% if r.sales_value > 0 %}
+                <span style="display: inline-block; padding: 0.2rem 0.55rem; background: var(--color-primary-soft); color: var(--color-primary); border-radius: 6px; font-weight: 800; font-size: 0.85rem;">
+                  {{ "{:,.0f}".format(r.sales_value) }} <span style="font-size: 0.72rem; font-weight: 600;">pcs</span>
+                </span>
+              {% else %}
+                <span style="color: var(--color-text-muted); font-size: 0.8rem;">{{ r.sales_raw or '-' }}</span>
+              {% endif %}
+            </td>
+
+            <!-- Product & Shop -->
+            <td style="max-width: 320px;">
+              <div style="font-weight: 700; color: var(--color-text); font-size: 0.88rem; line-height: 1.3; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="{{ r.product_name }}">
+                {% if r.product_url %}
+                  <a href="{{ r.product_url }}" target="_blank" style="color: var(--color-primary); text-decoration: none;">
+                    {{ r.product_name }}
+                  </a>
+                {% else %}
+                  {{ r.product_name }}
+                {% endif %}
+              </div>
+              <div style="font-size: 0.75rem; color: var(--color-text-muted); margin-top: 0.2rem;">
+                Toko: <strong>{{ r.shop_name or '-' }}</strong> &bull; ID: <code>{{ r.source_product_id }}</code>
+              </div>
+            </td>
+
+            <!-- Creator -->
+            <td>
+              {% if r.creator_name %}
+                <span style="display: inline-block; padding: 0.15rem 0.5rem; background: #FDF2F8; color: #BE185D; border-radius: 6px; font-weight: 700; font-size: 0.78rem;">
+                  {{ r.creator_name }}
+                </span>
+                {% if r.product_rank %}
+                  <div style="font-size: 0.72rem; color: var(--color-text-muted); margin-top: 0.2rem;">Produk ke-{{ r.product_rank }}</div>
+                {% endif %}
+              {% else %}
+                <span style="color: var(--color-text-muted); font-size: 0.78rem;">Modul Produk</span>
+              {% endif %}
+            </td>
+
+            <!-- Revenue -->
+            <td>
+              {% if r.revenue_value > 0 %}
+                <div style="font-weight: 800; color: var(--color-success); font-size: 0.92rem;">
+                  {{ r.currency_code }} {{ "{:,.0f}".format(r.revenue_value) }}
+                </div>
+                <div style="font-size: 0.72rem; color: var(--color-text-muted);">
+                  {{ r.revenue_raw }}
+                </div>
+              {% else %}
+                <span style="color: var(--color-text-muted);">{{ r.revenue_raw or '-' }}</span>
+              {% endif %}
+            </td>
+
+            <!-- Action -->
+            <td style="text-align: center; white-space: nowrap;">
+              <div style="display: flex; gap: 0.35rem; justify-content: center;">
+                {% if r.product_url %}
+                  <a href="{{ r.product_url }}" target="_blank" class="btn-kurma-secondary" style="padding: 0.3rem 0.6rem; font-size: 0.75rem;" title="Buka Detail Produk">
+                    Produk
+                  </a>
+                {% endif %}
+                {% if r.video_url %}
+                  <a href="{{ r.video_url }}" target="_blank" class="btn-kurma-secondary" style="padding: 0.3rem 0.6rem; font-size: 0.75rem; background: #FDF2F8; color: #BE185D; border-color: #FBCFE8;" title="Lihat Video TikTok">
+                    Video
+                  </a>
+                {% endif %}
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        {% else %}
+          <tr>
+            <td colspan="7" style="text-align: center; padding: 3rem 1rem; color: var(--color-text-muted);">
+              <div style="display: flex; justify-content: center; margin-bottom: 0.5rem; color: var(--color-text-subtle);">
+                {{ icon('search', 32) }}
+              </div>
+              <p style="font-weight: 700; font-size: 0.95rem; color: var(--color-text);">Tidak ada produk yang memenuhi kriteria filter</p>
+              <p style="font-size: 0.8rem; margin-top: 0.25rem;">Coba sesuaikan batas komisi atau pilih "Semua Wilayah".</p>
+            </td>
+          </tr>
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Chart.js for Matrix Visualization -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+  const chartData = {{ (chart.scatter if (chart and chart.scatter is defined) else [])|tojson }};
+  const ctx = document.getElementById("matrixChart");
+  if (!ctx || !chartData || chartData.length === 0) return;
+
+  const datasetPoints = chartData.map(pt => {
+    let color = "#0284c7"; // Komisi Sedang (blue)
+    if (pt.tier === "LOW_COMM") color = "#15803d"; // Komisi Rendah (emerald green)
+    else if (pt.tier === "HIGH_COMM") color = "#dc2626"; // Komisi Tinggi (red)
+
+    return {
+      x: pt.x,
+      y: pt.y,
+      productName: pt.name,
+      shopName: pt.shop,
+      score: pt.score,
+      backgroundColor: color,
+      borderColor: color,
+      pointRadius: pt.tier === "LOW_COMM" ? 6 : 5,
+      pointHoverRadius: 8
+    };
+  });
+
+  new Chart(ctx, {
+    type: "scatter",
+    data: {
+      datasets: [{
+        label: "Produk & Kreator",
+        data: datasetPoints,
+        backgroundColor: datasetPoints.map(d => d.backgroundColor),
+        borderColor: datasetPoints.map(d => d.borderColor),
+        borderWidth: 1
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: "rgba(11, 61, 50, 0.95)",
+          padding: 10,
+          titleFont: { size: 13, weight: "bold" },
+          bodyFont: { size: 12 },
+          callbacks: {
+            title: function (items) {
+              const raw = items[0].raw;
+              return raw.productName || "Detail Produk";
+            },
+            label: function (item) {
+              const raw = item.raw;
+              return [
+                "Toko: " + raw.shopName,
+                "Komisi: " + raw.x + "%",
+                "Revenue: Rp " + raw.y.toLocaleString() + " Juta",
+                "Penjualan: " + (raw.sales ? raw.sales.toLocaleString() + " pcs" : "-")
+              ];
+            }
+          }
+        }
+      },
+      scales: {
+        x: {
+          title: {
+            display: true,
+            text: "Persentase Komisi (%) — Semakin ke kiri semakin hemat",
+            color: "#64748b",
+            font: { weight: "bold", size: 11 }
+          },
+          grid: { color: "#eef4f0" }
+        },
+        y: {
+          title: {
+            display: true,
+            text: "Revenue (Juta Rupiah) — Semakin ke atas semakin tinggi",
+            color: "#64748b",
+            font: { weight: "bold", size: 11 }
+          },
+          grid: { color: "#eef4f0" }
+        }
+      }
+    }
+  });
+});
+</script>
+{% endblock %}

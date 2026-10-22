@@ -1,0 +1,34 @@
+app:
+  timezone: "Asia/Jakarta"
+  schedule_cron: "0 1 * * *"
+  schedule_hour_wib: 1
+  min_free_disk_mb: 2000
+  session_check_interval_hours: 6
+  kalodata_ui_language: "en"
+
+scraping:
+  max_products_per_country: 2000
+  min_creator_revenue_idr: 4000000
+  min_product_sales: 50
+  checkpoint_every: 25
+  max_reject_ratio: 0.20
+  delay_page_min_sec: 2.0
+  delay_page_max_sec: 5.0
+  delay_detail_min_sec: 1.5
+  delay_detail_max_sec: 4.0
+  job_timeout_minutes: 90
+  daily_run_timeout_minutes: 300
+  max_videos_scanned: 50
+
+readiness:
+  retry_minutes: 60
+  deadline_hour_wib: 10
+
+export:
+  export_empty_file: false
+
+retention:
+  excel_days: 5
+  screenshot_days: 30
+  log_days: 30
+  audit_days: 365

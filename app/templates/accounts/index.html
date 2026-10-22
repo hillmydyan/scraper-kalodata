@@ -1,0 +1,311 @@
+{% extends "base.html" %}
+{% from "components/icons.html" import icon %}
+
+{% block title %}Manajemen Akun & Sesi Kalodata — Kurma Scraper{% endblock %}
+
+{% block content %}
+<div style="margin-bottom: 2rem;">
+  <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem;">
+    <div>
+      <h1 style="font-size: 1.65rem; font-weight: 800; color: var(--color-text); letter-spacing: -0.02em;">
+        Manajemen Akun &amp; Sesi Kalodata
+      </h1>
+      <p style="color: var(--color-text-muted); font-size: 0.92rem; margin-top: 0.25rem;">
+        Konfigurasi kredensial akun Kalodata multi-region (Indonesia, Malaysia, dan Thailand). Satu akun kini aktif untuk semua target region tanpa perlu berganti-ganti profil.
+      </p>
+    </div>
+    <div style="display: flex; gap: 0.5rem; align-items: center;">
+      <span style="display: inline-flex; align-items: center; gap: 0.45rem; background: var(--color-primary-soft); padding: 0.35rem 0.85rem; border-radius: var(--radius-full); font-size: 0.8rem; font-weight: 700; color: var(--color-primary); border: 1px solid var(--color-border);">
+        <span class="pulse-dot"></span>
+        Single Account Multi-Region Active (ID, MY, TH)
+      </span>
+    </div>
+  </div>
+</div>
+
+<!-- Primary Multi-Region Account Hero Card -->
+<div class="card-kurma" style="border-top: 4px solid var(--color-primary); position: relative; margin-bottom: 2rem;">
+  <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 1rem; margin-bottom: 1.25rem;">
+    <div style="display: flex; align-items: center; gap: 0.85rem;">
+      <div style="display: flex; gap: 4px; align-items: center;">
+        <span class="country-badge" style="width: 36px; height: 36px; font-size: 0.85rem; font-weight: 800;" title="Indonesia">ID</span>
+        <span class="country-badge" style="width: 36px; height: 36px; font-size: 0.85rem; font-weight: 800; background: var(--color-warning-bg); color: var(--color-warning);" title="Malaysia">MY</span>
+        <span class="country-badge" style="width: 36px; height: 36px; font-size: 0.85rem; font-weight: 800; background: var(--color-info-bg); color: var(--color-info);" title="Thailand">TH</span>
+      </div>
+      <div>
+        <h2 style="font-size: 1.25rem; font-weight: 800; color: var(--color-text); margin: 0;">
+          Akun Utama Kalodata (Multi-Region 🇮🇩 🇲🇾 🇹🇭)
+        </h2>
+        <span style="font-size: 0.8rem; color: var(--color-text-muted); font-weight: 600;">
+          Profil Browser: <code>{{ primary_profile.profile_dir_name }}</code> &bull; Cakupan: 
+          {% for c in primary_profile.country_scope %}
+            <strong style="color: var(--color-text);">{{ c }}</strong>{% if not loop.last %}, {% endif %}
+          {% endfor %}
+        </span>
+      </div>
+    </div>
+    <div>
+      <span class="status-pill status-{{ primary_profile.session_status }}" style="font-size: 0.85rem; padding: 0.35rem 0.85rem;">
+        {{ primary_profile.session_status }}
+      </span>
+    </div>
+  </div>
+
+  <!-- Multi-Region Information Alert -->
+  <div style="background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.25); border-radius: var(--radius-sm); padding: 0.85rem 1.15rem; margin-bottom: 1.25rem; display: flex; align-items: flex-start; gap: 0.75rem;">
+    <div style="font-size: 1.2rem; line-height: 1.2;">✨</div>
+    <div style="font-size: 0.85rem; color: var(--color-text); line-height: 1.6;">
+      <strong>1 Akun untuk Seluruh Region:</strong> Akun ini kini mencakup target region <strong>Indonesia (ID)</strong>, <strong>Malaysia (MY)</strong>, dan <strong>Thailand (TH)</strong> secara langsung. Anda tidak perlu login berganti-ganti akun. Saat scraping dijalankan untuk region mana pun, sistem otomatis menyesuaikan target region di Kalodata menggunakan sesi browser terpadu yang sama.
+    </div>
+  </div>
+
+  <!-- Subscription Tier Status Info -->
+  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 0.75rem; margin-bottom: 1.5rem;">
+    <div style="background: rgba(245, 158, 11, 0.08); border: 1px solid rgba(245, 158, 11, 0.25); border-radius: var(--radius-sm); padding: 0.65rem 0.85rem; display: flex; align-items: center; justify-content: space-between;">
+      <div style="display: flex; align-items: center; gap: 0.45rem;">
+        <span style="font-size: 1.1rem;">🇲🇾</span>
+        <div>
+          <strong style="font-size: 0.82rem; color: var(--color-text);">Malaysia (MY)</strong>
+          <div style="font-size: 0.72rem; color: var(--color-text-muted);">Akses penuh (Full VIP data)</div>
+        </div>
+      </div>
+      <span style="font-size: 0.72rem; font-weight: 700; background: var(--color-warning, #f59e0b); color: #fff; padding: 0.15rem 0.5rem; border-radius: 4px;">VIP ACTIVE</span>
+    </div>
+
+    <div style="background: var(--color-neutral-bg, #f8fafc); border: 1px solid var(--color-border); border-radius: var(--radius-sm); padding: 0.65rem 0.85rem; display: flex; align-items: center; justify-content: space-between;">
+      <div style="display: flex; align-items: center; gap: 0.45rem;">
+        <span style="font-size: 1.1rem;">🇮🇩</span>
+        <div>
+          <strong style="font-size: 0.82rem; color: var(--color-text);">Indonesia (ID)</strong>
+          <div style="font-size: 0.72rem; color: var(--color-text-muted);">Mode Free (Kuota halaman awal)</div>
+        </div>
+      </div>
+      <span style="font-size: 0.72rem; font-weight: 600; background: var(--color-neutral-border, #e2e8f0); color: var(--color-text-muted); padding: 0.15rem 0.5rem; border-radius: 4px;">FREE TIER</span>
+    </div>
+
+    <div style="background: var(--color-neutral-bg, #f8fafc); border: 1px solid var(--color-border); border-radius: var(--radius-sm); padding: 0.65rem 0.85rem; display: flex; align-items: center; justify-content: space-between;">
+      <div style="display: flex; align-items: center; gap: 0.45rem;">
+        <span style="font-size: 1.1rem;">🇹🇭</span>
+        <div>
+          <strong style="font-size: 0.82rem; color: var(--color-text);">Thailand (TH)</strong>
+          <div style="font-size: 0.72rem; color: var(--color-text-muted);">Mode Free (Kuota halaman awal)</div>
+        </div>
+      </div>
+      <span style="font-size: 0.72rem; font-weight: 600; background: var(--color-neutral-border, #e2e8f0); color: var(--color-text-muted); padding: 0.15rem 0.5rem; border-radius: 4px;">FREE TIER</span>
+    </div>
+  </div>
+
+  <!-- Form Update Kredensial Multi-Region -->
+  <form method="POST" action="{{ url_for('accounts.save_account') }}" style="margin-bottom: 1.5rem;">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+    <input type="hidden" name="profile_id" value="{{ primary_profile.id }}"/>
+
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.25rem; margin-bottom: 1rem;">
+      <div class="form-group" style="margin-bottom: 0;">
+        <label class="form-label" style="display: flex; justify-content: space-between;">
+          <span>Email Akun Kalodata</span>
+          <span style="font-weight: 500; color: var(--color-text-muted); font-size: 0.75rem;">Login ID Kalodata</span>
+        </label>
+        <div style="position: relative;">
+          <input 
+            type="email" 
+            name="account_email" 
+            value="{{ primary_profile.account_email or '' }}" 
+            placeholder="contoh: akun-kalodata@domain.com" 
+            class="form-input" 
+            style="padding-left: 2.2rem;"
+            required
+          />
+          <span style="position: absolute; left: 0.75rem; top: 50%; transform: translateY(-50%); color: var(--color-text-muted);">
+            {{ icon('mail', 16) }}
+          </span>
+        </div>
+      </div>
+
+      <div class="form-group" style="margin-bottom: 0;">
+        <label class="form-label" style="display: flex; justify-content: space-between;">
+          <span>Kata Sandi (Password)</span>
+          <span style="font-weight: 500; color: var(--color-text-muted); font-size: 0.75rem;">Tersimpan aman</span>
+        </label>
+        <div style="position: relative;">
+          <input 
+            type="password" 
+            id="pwd_main" 
+            name="account_password" 
+            value="{{ primary_profile.account_password or '' }}" 
+            placeholder="Masukkan kata sandi akun Kalodata" 
+            class="form-input" 
+            style="padding-left: 2.2rem; padding-right: 2.5rem;"
+          />
+          <span style="position: absolute; left: 0.75rem; top: 50%; transform: translateY(-50%); color: var(--color-text-muted);">
+            {{ icon('lock', 16) }}
+          </span>
+          <button 
+            type="button" 
+            onclick="togglePasswordVisibility('pwd_main', this)"
+            style="position: absolute; right: 0.75rem; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; color: var(--color-text-muted); padding: 4px; display: flex; align-items: center;"
+            title="Tampilkan / Sembunyikan Sandi"
+          >
+            {{ icon('eye', 16) }}
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="form-group" style="margin-bottom: 1.25rem;">
+      <label class="form-label">Catatan Akun</label>
+      <input 
+        type="text" 
+        name="notes" 
+        value="{{ primary_profile.notes or 'Akun Utama Kalodata Multi-Region (ID, MY, TH)' }}" 
+        placeholder="Catatan profil..." 
+        class="form-input"
+      />
+    </div>
+
+    <div style="display: flex; justify-content: space-between; align-items: center; padding-top: 0.75rem; border-top: 1px dashed var(--color-border); margin-bottom: 1.25rem;">
+      <div style="font-size: 0.78rem; color: var(--color-text-muted);">
+        Terakhir Divalidasi: <strong>{{ format_wib(primary_profile.last_validated_at) if primary_profile.last_validated_at else 'Belum divalidasi' }}</strong>
+      </div>
+      <button type="submit" class="btn-kurma" style="padding: 0.55rem 1.25rem; font-size: 0.84rem;">
+        {{ icon('check', 14) }}
+        <span>Simpan Kredensial Akun</span>
+      </button>
+    </div>
+  </form>
+
+  <!-- Quick Action Launcher Buttons -->
+  <div style="background: var(--color-primary-light); border: 1px solid var(--color-border); border-radius: var(--radius-sm); padding: 1rem 1.25rem;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 0.5rem;">
+      <div>
+        <div style="font-size: 0.75rem; font-weight: 800; color: var(--color-primary); text-transform: uppercase; letter-spacing: 0.05em;">
+          Aksi Sesi Browser Terpadu
+        </div>
+        <div style="font-size: 0.78rem; color: var(--color-text-muted); margin-top: 0.15rem;">
+          Cukup validasi atau login sekali di sini untuk mengaktifkan scraping semua region (ID, MY, TH).
+        </div>
+      </div>
+      <div>
+        <span class="status-pill status-{{ primary_profile.session_status }}">{{ primary_profile.session_status }}</span>
+      </div>
+    </div>
+    <div style="display: flex; gap: 0.75rem; flex-wrap: wrap;">
+      <form method="POST" action="{{ url_for('accounts.open_login', profile_id=primary_profile.id) }}" style="flex: 1; min-width: 180px;">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+        <button type="submit" class="btn-kurma" style="width: 100%; padding: 0.6rem 1rem; font-size: 0.85rem; justify-content: center;">
+          {{ icon('browser', 15) }}
+          <span>Buka Browser Login</span>
+        </button>
+      </form>
+      <form method="POST" action="{{ url_for('accounts.validate', profile_id=primary_profile.id) }}" style="flex: 1; min-width: 150px;">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+        <button type="submit" class="btn-kurma-secondary" style="width: 100%; justify-content: center; padding: 0.6rem 1rem; font-size: 0.85rem;">
+          {{ icon('refresh', 15) }}
+          <span>Validasi Sesi Browser</span>
+        </button>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Panduan Praktis -->
+<div class="card-kurma" style="margin-bottom: 2rem;">
+  <div class="section-header" style="margin-bottom: 0.75rem;">
+    <h3 class="section-title">
+      Panduan Penggunaan Akun Multi-Region
+    </h3>
+  </div>
+  <div style="font-size: 0.88rem; line-height: 1.75; color: var(--color-text-muted);">
+    <ol style="margin-left: 1.25rem;">
+      <li>
+        <strong>Satu Akun untuk Semua:</strong> Anda hanya memerlukan 1 akun Kalodata yang memiliki akses ke Indonesia, Malaysia, dan Thailand.
+      </li>
+      <li>
+        <strong>Buka Browser Login Sekali:</strong> Klik tombol <strong>"Buka Browser Login"</strong> jika sesi Anda berstatus <code>LOGIN_REQUIRED</code> atau belum aktif. Kredensial yang tersimpan akan otomatis terisi.
+      </li>
+      <li>
+        <strong>Selesaikan Login &amp; Verifikasi:</strong> Lakukan login pada jendela browser yang terbuka. Setelah berhasil masuk ke dashboard Kalodata, Anda dapat menutup jendela browser.
+      </li>
+      <li>
+        <strong>Validasi Sesi:</strong> Klik <strong>"Validasi Sesi Browser"</strong> untuk memastikan sesi berstatus <code>READY</code>. Sesi ini otomatis dipakai untuk eksekusi scraper region ID, MY, maupun TH.
+      </li>
+    </ol>
+  </div>
+</div>
+
+<!-- Tabel Ringkasan Semua Profil -->
+<div class="card-kurma">
+  <div class="section-header" style="margin-bottom: 1.25rem;">
+    <h3 class="section-title">
+      Status Profil Kalodata di Database
+    </h3>
+  </div>
+  <div class="table-wrapper">
+    <table class="kurma-table">
+      <thead>
+        <tr>
+          <th>Label Profil</th>
+          <th>Cakupan Wilayah</th>
+          <th>Status Sesi</th>
+          <th>Email Terdaftar</th>
+          <th>Terakhir Divalidasi</th>
+          <th>Catatan</th>
+          <th>Aksi Cepat</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for p in profiles %}
+        <tr {% if not p.enabled %}style="opacity: 0.65;"{% endif %}>
+          <td>
+            <div style="display: flex; align-items: center; gap: 0.45rem;">
+              <strong style="color: var(--color-text);">{{ p.account_label }}</strong>
+              {% if p.account_label == primary_profile.account_label %}
+                <span style="font-size: 0.68rem; font-weight: 700; background: var(--color-primary-soft); color: var(--color-primary); padding: 0.15rem 0.45rem; border-radius: 4px;">UTAMA</span>
+              {% elif not p.enabled %}
+                <span style="font-size: 0.68rem; font-weight: 600; background: var(--color-neutral-bg, #eee); color: var(--color-text-muted); padding: 0.15rem 0.45rem; border-radius: 4px;">NON-AKTIF</span>
+              {% endif %}
+            </div>
+            <div style="font-size: 0.75rem; color: var(--color-text-muted);">dir: <code>{{ p.profile_dir_name }}</code></div>
+          </td>
+          <td>
+            {% for c in (p.country_scope or []) %}
+              <span class="country-badge" style="width: 26px; height: 26px; font-size: 0.75rem; margin-right: 3px;">{{ c }}</span>
+            {% endfor %}
+          </td>
+          <td><span class="status-pill status-{{ p.session_status }}">{{ p.session_status }}</span></td>
+          <td style="font-size: 0.82rem; font-family: monospace;">{{ p.account_email or '-' }}</td>
+          <td style="font-size: 0.82rem;">{{ format_wib(p.last_validated_at) if p.last_validated_at else '-' }}</td>
+          <td style="color: var(--color-text-muted); font-size: 0.82rem;">{{ p.notes or '-' }}</td>
+          <td style="display: flex; gap: 0.4rem; align-items: center;">
+            <form method="POST" action="{{ url_for('accounts.open_login', profile_id=p.id) }}" style="display:inline;">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+              <button type="submit" class="btn-kurma" style="padding: 0.35rem 0.75rem; font-size: 0.78rem;">
+                Browser
+              </button>
+            </form>
+            <form method="POST" action="{{ url_for('accounts.validate', profile_id=p.id) }}" style="display:inline;">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+              <button type="submit" class="btn-kurma-secondary" style="padding: 0.35rem 0.75rem; font-size: 0.78rem;">
+                Validasi
+              </button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+function togglePasswordVisibility(inputId, btn) {
+  const input = document.getElementById(inputId);
+  if (!input) return;
+  if (input.type === 'password') {
+    input.type = 'text';
+  } else {
+    input.type = 'password';
+  }
+}
+</script>
+{% endblock %}

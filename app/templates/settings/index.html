@@ -1,0 +1,162 @@
+{% extends "base.html" %}
+{% from "components/icons.html" import icon %}
+
+{% block title %}Pengaturan Sistem - Kurma Scraper{% endblock %}
+
+{% block content %}
+<div style="margin-bottom: 2rem;">
+  <h1 style="font-size: 1.5rem; font-weight: 800; color: var(--color-sidebar); display: flex; align-items: center; gap: 0.6rem;">
+    {{ icon('settings', 26, stroke=2, color='var(--color-primary)') }}
+    <span>{{ 'Pengaturan Sistem & Kebijakan' | safe }} Operasional</span>
+  </h1>
+  <p style="color: var(--color-text-muted); font-size: 0.88rem; margin-top: 0.25rem;">
+    Konfigurasi retensi data, batas kapasitas penarikan Kalodata, dan riwayat audit aktivitas sistem.
+  </p>
+</div>
+
+<!-- Configuration Display -->
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.5rem; margin-bottom: 2rem;">
+  <!-- Card 1: Retensi Data -->
+  <div class="card-kurma">
+    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.25rem; border-bottom: 1px solid var(--color-border-subtle); padding-bottom: 0.75rem;">
+      <div style="display: flex; align-items: center; gap: 0.5rem;">
+        {{ icon('storage', 20, color='var(--color-primary)') }}
+        <h2 class="card-title" style="margin: 0;">Kebijakan Retensi Data</h2>
+      </div>
+      <span class="badge" style="background: rgba(16, 185, 129, 0.1); color: var(--color-success); font-weight: 700; font-size: 0.75rem; padding: 0.2rem 0.5rem; border-radius: 4px;">Aktif ({{ settings.retention_excel_days }} Hari)</span>
+    </div>
+
+    <form method="POST" action="{{ url_for('settings.update_retention') }}" style="margin-bottom: 1rem; background: #F8FAFC; border: 1px solid var(--color-border-subtle); border-radius: 8px; padding: 0.75rem;">
+      <label style="display: block; font-size: 0.8rem; font-weight: 700; color: var(--color-sidebar); margin-bottom: 0.35rem;">
+        Masa Simpan Berkas Excel (.xlsx):
+      </label>
+      <div style="display: flex; gap: 0.5rem; align-items: center;">
+        <input type="number" name="retention_excel_days" value="{{ settings.retention_excel_days }}" min="1" max="365" required
+               class="form-control" style="width: 80px; padding: 0.4rem 0.6rem; font-size: 0.88rem; font-weight: 700; text-align: center;">
+        <span style="font-size: 0.85rem; color: var(--color-text-muted);">Hari</span>
+        <button type="submit" class="btn btn-primary" style="margin-left: auto; padding: 0.4rem 0.85rem; font-size: 0.8rem; display: flex; align-items: center; gap: 0.3rem;">
+          {{ icon('check', 14, stroke=2.5) }} Simpan &amp; Bersihkan
+        </button>
+      </div>
+    </form>
+
+    <div style="font-size: 0.85rem; line-height: 1.9; color: var(--color-text);">
+      <div style="display: flex; justify-content: space-between;">
+        <span style="color: var(--color-text-muted);">Screenshot Diagnostik:</span>
+        <strong>{{ settings.retention_screenshot_days }} hari</strong>
+      </div>
+      <div style="display: flex; justify-content: space-between;">
+        <span style="color: var(--color-text-muted);">Log Eksekusi &amp; Server:</span>
+        <strong>{{ settings.retention_log_days }} hari</strong>
+      </div>
+      <div style="display: flex; justify-content: space-between; border-top: 1px dashed var(--color-border-subtle); padding-top: 0.35rem; margin-top: 0.35rem;">
+        <span style="color: var(--color-text-muted);">Database Hasil:</span>
+        <strong style="color: var(--color-success);">Permanen (Tidak Dihapus)</strong>
+      </div>
+    </div>
+  </div>
+
+  <!-- Card 2: Batas & Parameter Scraper -->
+  <div class="card-kurma">
+    <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 1.25rem; border-bottom: 1px solid var(--color-border-subtle); padding-bottom: 0.75rem;">
+      {{ icon('server', 20, color='var(--color-primary)') }}
+      <h2 class="card-title" style="margin: 0;">Batas &amp; Parameter Scraper</h2>
+    </div>
+    <div style="font-size: 0.88rem; line-height: 2.1; color: var(--color-text);">
+      <div style="display: flex; justify-content: space-between;">
+        <span style="color: var(--color-text-muted);">Maks Entitas / Negara:</span>
+        <strong>{{ settings.max_products }} data</strong>
+      </div>
+      <div style="display: flex; justify-content: space-between;">
+        <span style="color: var(--color-text-muted);">Batas Waktu Kesiapan:</span>
+        <strong>Pukul {{ settings.readiness_hour }}.00 WIB</strong>
+      </div>
+      <div style="display: flex; justify-content: space-between; border-top: 1px dashed var(--color-border-subtle); padding-top: 0.35rem; margin-top: 0.35rem;">
+        <span style="color: var(--color-text-muted);">Ekspor File Kosong (NO_DATA):</span>
+        {% if settings.export_empty_file %}
+          <strong style="color: var(--color-success);">Aktif</strong>
+        {% else %}
+          <strong style="color: var(--color-text-muted);">Nonaktif</strong>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Card 3: Integrasi Webhook -->
+  <div class="card-kurma">
+    <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 1.25rem; border-bottom: 1px solid var(--color-border-subtle); padding-bottom: 0.75rem;">
+      {{ icon('mail', 20, color='var(--color-primary)') }}
+      <h2 class="card-title" style="margin: 0;">Integrasi Webhook Notifikasi</h2>
+    </div>
+    <div style="font-size: 0.88rem; line-height: 1.9; color: var(--color-text);">
+      <div style="margin-bottom: 0.5rem;">
+        <span style="color: var(--color-text-muted); display: block; font-size: 0.78rem; text-transform: uppercase; font-weight: 700; margin-bottom: 0.25rem;">Target Endpoint:</span>
+        {% if settings.webhook_url %}
+          <code style="word-break: break-all; background: #F1F5F9; padding: 0.3rem 0.6rem; border-radius: 4px; font-size: 0.8rem; display: block;">{{ settings.webhook_url }}</code>
+        {% else %}
+          <span style="color: var(--color-text-muted); font-style: italic;">Belum dikonfigurasi (.env)</span>
+        {% endif %}
+      </div>
+      <p style="color: var(--color-text-muted); font-size: 0.8rem; margin: 0.5rem 0 0 0; line-height: 1.5;">
+        Ringkasan eksekusi otomatis harian dapat dikirim via POST JSON ke endpoint webhook ini saat pipeline selesai.
+      </p>
+    </div>
+  </div>
+</div>
+
+<!-- Audit Log Viewer -->
+<div class="card-kurma">
+  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem;">
+    <h2 class="card-title" style="margin: 0; display: flex; align-items: center; gap: 0.45rem;">
+      {{ icon('database', 18, color='var(--color-primary)') }}
+      <span>Riwayat Aktivitas Audit Log (100 Terakhir)</span>
+    </h2>
+    <span style="font-size: 0.82rem; color: var(--color-text-muted);">
+      Rekaman audit keamanan &amp; perubahan konfigurasi
+    </span>
+  </div>
+
+  <div class="table-wrapper">
+    <table class="kurma-table">
+      <thead>
+        <tr>
+          <th>Waktu (WIB)</th>
+          <th>Aktor</th>
+          <th>Aksi</th>
+          <th>Target</th>
+          <th>IP Address</th>
+          <th>Detail</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% if audit_logs %}
+          {% for a in audit_logs %}
+          <tr>
+            <td><strong>{{ format_wib(a.timestamp) }}</strong></td>
+            <td>
+              <span style="display: inline-flex; align-items: center; gap: 0.3rem; font-weight: 700; color: var(--color-sidebar);">
+                {{ a.actor_id or 'system' }}
+              </span>
+            </td>
+            <td>
+              <span class="status-pill status-READY" style="font-size: 0.72rem;">{{ a.action }}</span>
+            </td>
+            <td><strong>{{ a.target_type or '-' }}</strong></td>
+            <td>
+              <code style="background: #F1F5F9; padding: 0.2rem 0.45rem; border-radius: 4px; font-size: 0.78rem;">{{ a.ip or '-' }}</code>
+            </td>
+            <td style="font-size: 0.82rem; color: var(--color-text-muted);">{{ a.details }}</td>
+          </tr>
+          {% endfor %}
+        {% else %}
+          <tr>
+            <td colspan="6" style="text-align: center; padding: 2.5rem; color: var(--color-text-muted);">
+              Belum ada riwayat aktivitas yang tercatat.
+            </td>
+          </tr>
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

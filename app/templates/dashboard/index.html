@@ -1,0 +1,322 @@
+{% extends "base.html" %}
+{% from "components/icons.html" import icon %}
+
+{% block title %}Dashboard Monitoring — Kurma Scraper{% endblock %}
+
+{% block content %}
+<!-- Hero Section (§5.C) -->
+<div class="hero-banner">
+  <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 1rem; position: relative; z-index: 2;">
+    <div>
+      <div class="hero-eyebrow">Ringkasan Operasional &bull; Selamat Datang di</div>
+      <h1 class="hero-title">Kurma Scraper</h1>
+      <p class="hero-desc">
+        Pantau status antrian scraping, kesehatan pipeline background, dan sesi akun Kalodata secara real-time.
+      </p>
+    </div>
+    <div>
+      <div class="hero-indicator">
+        <span class="pulse-dot"></span>
+        <span>Monitoring Aktif (WIB)</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- System Overview Bar (6 Metrics Horizontal Card - §6) -->
+<div class="system-overview-card">
+  <div class="system-overview-grid">
+    <!-- 1. Database -->
+    <div class="system-metric-item">
+      <div style="display: flex; align-items: center; gap: 0.35rem; color: var(--color-text-muted);">
+        {{ icon('database', 15) }}
+        <span class="system-metric-label">Database</span>
+      </div>
+      <div class="system-metric-value" style="color: var(--color-success);">
+        {{ (system_status or {}).get('db', 'ONLINE') }}
+      </div>
+    </div>
+
+    <!-- 2. Redis Queue -->
+    <div class="system-metric-item">
+      <div style="display: flex; align-items: center; gap: 0.35rem; color: var(--color-text-muted);">
+        {{ icon('server', 15) }}
+        <span class="system-metric-label">Redis Queue</span>
+      </div>
+      <div class="system-metric-value" style="color: var(--color-success);">
+        {{ (system_status or {}).get('redis', 'ONLINE') }}
+      </div>
+    </div>
+
+    <!-- 3. Browser Engine -->
+    <div class="system-metric-item">
+      <div style="display: flex; align-items: center; gap: 0.35rem; color: var(--color-text-muted);">
+        {{ icon('browser', 15) }}
+        <span class="system-metric-label">Browser Engine</span>
+      </div>
+      <div class="system-metric-value" style="font-size: 1rem;">
+        Google Chrome
+      </div>
+    </div>
+
+    <!-- 4. Jadwal Otomatis -->
+    <div class="system-metric-item">
+      <div style="display: flex; align-items: center; gap: 0.35rem; color: var(--color-text-muted);">
+        {{ icon('clock', 15) }}
+        <span class="system-metric-label">Jadwal Otomatis</span>
+      </div>
+      <div class="system-metric-value" style="font-size: 0.95rem; color: var(--color-primary);">
+        {{ (system_status or {}).get('next_run_wib', 'Pukul 01:00 WIB') }}
+      </div>
+    </div>
+
+    <!-- 5. Penyimpanan Bebas -->
+    <div class="system-metric-item">
+      <div style="display: flex; align-items: center; gap: 0.35rem; color: var(--color-text-muted);">
+        {{ icon('storage', 15) }}
+        <span class="system-metric-label">Penyimpanan Bebas</span>
+      </div>
+      <div class="system-metric-value">
+        {{ (system_status or {}).get('disk_free_mb', '500+') }} MB
+      </div>
+    </div>
+
+    <!-- 6. Total File Hasil -->
+    <div class="system-metric-item">
+      <div style="display: flex; align-items: center; gap: 0.35rem; color: var(--color-text-muted);">
+        {{ icon('results', 15) }}
+        <span class="system-metric-label">Total File Hasil</span>
+      </div>
+      <div class="system-metric-value" style="color: var(--color-primary);">
+        {{ (system_status or {}).get('total_exports_count', 0) }} berkas
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Monitoring Scraping per Wilayah (§7) -->
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem;">
+  <h2 class="section-title">Status Scraping Terkini per Wilayah</h2>
+  <a href="{{ url_for('results.index') }}" style="font-size: 0.85rem; font-weight: 700; color: var(--color-primary); text-decoration: none; display: inline-flex; align-items: center; gap: 0.35rem;">
+    <span>Unduh Hasil di Halaman Hasil &amp; Ekspor</span>
+    {{ icon('arrow-right', 14) }}
+  </a>
+</div>
+
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1.5rem; margin-bottom: 2.25rem;">
+  {% for code, label in [('ID', 'Indonesia'), ('MY', 'Malaysia'), ('TH', 'Thailand')] %}
+  {% set c_info = country_cards.get(code, {}) %}
+  {% set job = c_info.get('job') %}
+  <div class="card-kurma" style="margin-bottom: 0; display: flex; flex-direction: column;">
+    <!-- Region Header -->
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem; border-bottom: 1px solid var(--color-border-subtle); padding-bottom: 0.85rem;">
+      <div style="display: flex; align-items: center; gap: 0.65rem;">
+        <span class="country-badge">{{ code }}</span>
+        <div>
+          <h3 style="font-size: 1.05rem; font-weight: 800; color: var(--color-text); line-height: 1.2;">{{ label }}</h3>
+          <span style="color: var(--color-text-muted); font-size: 0.75rem; font-weight: 600;">Kalodata Region {{ code }}</span>
+        </div>
+      </div>
+      <div>
+        {% if job %}
+          <span class="status-pill status-{{ job.status }}">{{ job.status }}</span>
+        {% else %}
+          <span class="status-pill status-PENDING">BELUM ADA RUN</span>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Region Details -->
+    <div style="font-size: 0.88rem; line-height: 1.85; color: var(--color-text-muted); flex: 1;">
+      {% if job %}
+        <div style="display: flex; justify-content: space-between;">
+          <span>Modul Scrape:</span>
+          <strong style="color: var(--color-text);">{{ 'Kreator' if job.module == 'creator' else 'Produk' }}</strong>
+        </div>
+        <div style="display: flex; justify-content: space-between;">
+          <span>Tahapan (Stage):</span>
+          <span style="font-family: monospace; font-size: 0.78rem; background: var(--color-primary-soft); padding: 1px 6px; border-radius: 4px; color: var(--color-primary); font-weight: 700;">{{ job.stage }}</span>
+        </div>
+        <div style="display: flex; justify-content: space-between;">
+          <span>Periode Data:</span>
+          <strong style="color: var(--color-text);">{{ job.period_start }}</strong>
+        </div>
+        <div style="display: flex; justify-content: space-between;">
+          <span>Waktu Mulai:</span>
+          <strong style="color: var(--color-text);">{{ format_wib(job.started_at) }}</strong>
+        </div>
+        <div style="display: flex; justify-content: space-between;">
+          <span>Data Ditemukan:</span>
+          <strong style="color: var(--color-text);">{{ job.rows_found }} item</strong>
+        </div>
+        <div style="display: flex; justify-content: space-between;">
+          <span>Data Disimpan:</span>
+          <strong style="color: var(--color-success); font-weight: 800;">{{ job.rows_saved }} item</strong>
+        </div>
+        {% if job.rows_rejected > 0 %}
+        <div style="display: flex; justify-content: space-between;">
+          <span>Data Ditolak:</span>
+          <strong style="color: var(--color-danger);">{{ job.rows_rejected }} item</strong>
+        </div>
+        {% endif %}
+      {% else %}
+        <div style="padding: 2rem 0; text-align: center; color: var(--color-text-muted);">
+          <p style="font-size: 0.85rem;">Belum ada aktivitas scraping untuk wilayah ini.</p>
+        </div>
+      {% endif %}
+    </div>
+
+    <!-- Region Footer Actions -->
+    <div style="margin-top: 1.25rem; padding-top: 0.85rem; border-top: 1px solid var(--color-border-subtle); display: flex; justify-content: space-between; align-items: center;">
+      {% if job %}
+        <a href="{{ url_for('jobs.detail', job_id=job.id) }}" style="font-size: 0.82rem; color: var(--color-primary); font-weight: 700; text-decoration: none; display: inline-flex; align-items: center; gap: 0.3rem;">
+          <span>Lihat Detail Job</span>
+          {{ icon('arrow-right', 13) }}
+        </a>
+        <a href="{{ url_for('results.index', country=code) }}" style="font-size: 0.82rem; color: var(--color-text-muted); text-decoration: none; display: inline-flex; align-items: center; gap: 0.3rem;">
+          <span>Buka Berkas Hasil</span>
+          {{ icon('arrow-right', 13) }}
+        </a>
+      {% else %}
+        <span style="font-size: 0.8rem; color: var(--color-text-muted);">Menunggu jadwal otomatis</span>
+      {% endif %}
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+<!-- Antrian & Riwayat Proses Scraping Terbaru Table -->
+<div class="card-kurma" style="margin-bottom: 2rem;">
+  <div class="section-header">
+    <div>
+      <h3 class="section-title">Antrian &amp; Riwayat Proses Scraping Terbaru</h3>
+      <p style="font-size: 0.82rem; color: var(--color-text-muted); margin-top: 0.2rem;">
+        Menampilkan 10 proses scraping yang baru dijalankan
+      </p>
+    </div>
+  </div>
+
+  <div class="table-wrapper">
+    <table class="kurma-table">
+      <thead>
+        <tr>
+          <th>Modul</th>
+          <th>Wilayah</th>
+          <th>Status</th>
+          <th>Tahapan</th>
+          <th>Item Disimpan</th>
+          <th>Waktu Mulai (WIB)</th>
+          <th>Durasi</th>
+          <th>Aksi</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% if recent_jobs %}
+          {% for rj in recent_jobs %}
+          <tr>
+            <td>
+              <span style="font-weight: 700; color: {% if rj.module == 'creator' %}var(--color-warning){% else %}var(--color-primary){% endif %}; font-size: 0.82rem;">
+                {{ 'Kreator' if rj.module == 'creator' else 'Produk' }}
+              </span>
+            </td>
+            <td>
+              <span class="country-badge" style="width: 28px; height: 28px; font-size: 0.78rem;">{{ rj.country_code }}</span>
+            </td>
+            <td>
+              <span class="status-pill status-{{ rj.status }}">{{ rj.status }}</span>
+            </td>
+            <td>
+              <span style="font-family: monospace; font-size: 0.78rem; background: var(--color-primary-soft); padding: 2px 6px; border-radius: 4px; color: var(--color-primary); font-weight: 700;">{{ rj.stage }}</span>
+            </td>
+            <td>
+              <strong style="color: var(--color-success);">{{ rj.rows_saved }}</strong>
+              <span style="color: var(--color-text-muted); font-size: 0.8rem;">/ {{ rj.rows_found }}</span>
+            </td>
+            <td style="font-size: 0.82rem;">{{ format_wib(rj.started_at) }}</td>
+            <td style="font-size: 0.82rem; color: var(--color-text-muted);">
+              {% if rj.started_at and rj.finished_at %}
+                {{ ((rj.finished_at - rj.started_at).total_seconds() / 60)|round(1) }} mnt
+              {% elif rj.status == 'RUNNING' %}
+                <span style="color: var(--color-info); font-weight: 700;">Berjalan...</span>
+              {% else %}
+                -
+              {% endif %}
+            </td>
+            <td>
+              <a href="{{ url_for('jobs.detail', job_id=rj.id) }}" class="btn-kurma-secondary" style="padding: 0.35rem 0.75rem; font-size: 0.78rem;">
+                Detail Job
+              </a>
+            </td>
+          </tr>
+          {% endfor %}
+        {% else %}
+          <tr>
+            <td colspan="8" style="text-align: center; padding: 2.5rem; color: var(--color-text-muted);">
+              Belum ada riwayat proses scraping.
+            </td>
+          </tr>
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Status Sesi Akun Kalodata -->
+<div class="card-kurma">
+  <div class="section-header">
+    <div>
+      <h3 class="section-title">Status Sesi Akun Kalodata</h3>
+      <p style="font-size: 0.82rem; color: var(--color-text-muted); margin-top: 0.2rem;">
+        Pemeriksaan status login pada browser persisten Kalodata
+      </p>
+    </div>
+    {% if current_user.role == 'admin' %}
+      <a href="{{ url_for('accounts.index') }}" class="btn-kurma-secondary" style="font-size: 0.82rem;">
+        Kelola Akun &amp; Sesi
+      </a>
+    {% endif %}
+  </div>
+
+  <div class="table-wrapper">
+    <table class="kurma-table">
+      <thead>
+        <tr>
+          <th>Profil Akun</th>
+          <th>Cakupan Wilayah</th>
+          <th>Status Sesi</th>
+          <th>Email Akun</th>
+          <th>Terakhir Divalidasi</th>
+          <th>Pemeriksaan</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for p in profiles %}
+        <tr>
+          <td><strong style="color: var(--color-text);">{{ p.account_label }}</strong></td>
+          <td>
+            {% for c in p.country_scope %}
+              <span class="country-badge" style="width: 24px; height: 24px; font-size: 0.72rem; margin-right: 3px;">{{ c }}</span>
+            {% endfor %}
+          </td>
+          <td><span class="status-pill status-{{ p.session_status }}">{{ p.session_status }}</span></td>
+          <td style="font-family: monospace; font-size: 0.82rem;">{{ p.account_email or '-' }}</td>
+          <td style="font-size: 0.82rem;">{{ format_wib(p.last_validated_at) if p.last_validated_at else 'Belum divalidasi' }}</td>
+          <td>
+            {% if current_user.role == 'admin' %}
+            <form method="POST" action="{{ url_for('accounts.validate', profile_id=p.id) }}" style="display:inline;">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+              <button type="submit" class="btn-kurma-secondary" style="padding: 0.35rem 0.75rem; font-size: 0.78rem;">
+                Validasi
+              </button>
+            </form>
+            {% else %}
+            -
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

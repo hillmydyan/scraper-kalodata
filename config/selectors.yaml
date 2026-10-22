@@ -1,0 +1,77 @@
+# Konfigurasi selector eksternal (§13.4)
+# Setiap selector wajib memiliki primary dan minimal 1 fallback.
+# Divalidasi dan diobservasi langsung pada UI aktual Kalodata.
+
+selectors:
+  login_page_indicator:
+    primary: "input[type='password']"
+    fallbacks:
+      - ".login-form"
+      - ".login-dialog"
+      - "div[role='dialog']:has(input[type='password'])"
+    kind: "css"
+
+  logged_in_indicator:
+    primary: "[data-testid='user-avatar']"
+    fallbacks:
+      - ".user-profile"
+      - "header img.avatar"
+      - "header div[class*='avatar']"
+      - "header .rounded-full"
+    kind: "css"
+
+  region_selector_trigger:
+    primary: "#region-dropdown"
+    fallbacks:
+      - "[data-testid='region-selector']"
+      - ".region-select"
+      - "header div[class*='bg-cover'][style*='background-image']"
+    kind: "css"
+
+  region_popover:
+    primary: ".region-dropdown-popover:not(.ant-popover-hidden)"
+    fallbacks:
+      - ".ant-popover:not(.ant-popover-hidden)"
+      - "div[role='tooltip']"
+    kind: "css"
+
+  language_selector_trigger:
+    primary: "[data-testid='language-selector']"
+    fallbacks:
+      - ".lang-select"
+    kind: "css"
+
+  product_table:
+    primary: "tbody"
+    fallbacks:
+      - "table"
+      - "[role='table']"
+      - ".el-table__body-wrapper"
+    kind: "css"
+
+  product_table_row:
+    primary: "tbody tr.group"
+    fallbacks:
+      - "tr.group.cursor-pointer"
+      - "tbody tr"
+      - "table tbody tr"
+    kind: "css"
+
+  date_picker_trigger:
+    primary: "div.inline-flex.items-center:has-text('Dates')"
+    fallbacks:
+      - "div.inline-flex.items-center:has-text('Tanggal')"
+      - "div.inline-flex.items-center:has-text('Date')"
+      - "[data-testid='date-range-picker']"
+      - ".date-picker"
+      - "input[placeholder*='date']"
+    kind: "css"
+
+  category_cascader:
+    primary: "div.inline-flex.items-center:has-text('Category')"
+    fallbacks:
+      - "div.inline-flex.items-center:has-text('Kategori')"
+      - ".FilterCategory"
+      - "[data-testid='category-filter']"
+      - ".category-cascader"
+    kind: "css"

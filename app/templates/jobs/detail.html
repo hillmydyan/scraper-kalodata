@@ -1,0 +1,175 @@
+{% extends "base.html" %}
+{% from "components/icons.html" import icon %}
+
+{% block title %}Detail Job {{ job.country_code }} - Kurma Scraper{% endblock %}
+
+{% block content %}
+<!-- Top Header & Breadcrumbs -->
+<div style="margin-bottom: 2rem; display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 1rem;">
+  <div>
+    <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.35rem;">
+      {% if job.country_code == 'ID' %}
+        <span class="country-badge" style="background:#FEE2E2; color:#DC2626;">ID</span>
+      {% elif job.country_code == 'MY' %}
+        <span class="country-badge" style="background:#DBEAFE; color:#2563EB;">MY</span>
+      {% elif job.country_code == 'TH' %}
+        <span class="country-badge" style="background:#FEF3C7; color:#D97706;">TH</span>
+      {% else %}
+        <span class="country-badge">{{ job.country_code }}</span>
+      {% endif %}
+      <h1 style="font-size: 1.5rem; font-weight: 800; color: var(--color-sidebar); margin: 0;">
+        Detail Job: {{ job.country_code }} &bull; Periode {{ job.period_start }}
+      </h1>
+      <span class="status-pill status-{{ job.status }}">{{ job.status }}</span>
+    </div>
+    <p style="color: var(--color-text-muted); font-size: 0.88rem; margin: 0;">
+      Job ID: <code style="background: var(--color-primary-soft); padding: 0.2rem 0.5rem; border-radius: 4px; font-weight: 600; color: var(--color-sidebar);">{{ job.id }}</code>
+      &bull; Modul: <strong>{{ (job.module or 'product')|upper }}</strong>
+    </p>
+  </div>
+  <div>
+    <a href="{{ url_for('jobs.index') }}" class="btn-kurma-secondary">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="19" y1="12" x2="5" y2="12"></line>
+        <polyline points="12 19 5 12 12 5"></polyline>
+      </svg>
+      <span>Kembali ke Daftar Job</span>
+    </a>
+  </div>
+</div>
+
+<!-- Status & Counter Cards -->
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.5rem; margin-bottom: 2rem;">
+  <!-- Card 1: Status Eksekusi -->
+  <div class="card-kurma">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem; border-bottom: 1px solid var(--color-border-subtle); padding-bottom: 0.75rem;">
+      <h2 class="card-title" style="margin: 0; display: flex; align-items: center; gap: 0.45rem;">
+        {{ icon('server', 18, color='var(--color-primary)') }}
+        <span>Status Eksekusi</span>
+      </h2>
+      <span class="status-pill status-{{ job.status }}">{{ job.status }}</span>
+    </div>
+    <div style="font-size: 0.88rem; line-height: 2; color: var(--color-text);">
+      <div style="display: flex; justify-content: space-between;">
+        <span style="color: var(--color-text-muted);">Tahap Saat Ini:</span>
+        <strong>{{ job.stage }}</strong>
+      </div>
+      <div style="display: flex; justify-content: space-between;">
+        <span style="color: var(--color-text-muted);">Waktu Mulai:</span>
+        <strong>{{ format_wib(job.started_at) }}</strong>
+      </div>
+      <div style="display: flex; justify-content: space-between;">
+        <span style="color: var(--color-text-muted);">Waktu Selesai:</span>
+        <strong>{{ format_wib(job.finished_at) }}</strong>
+      </div>
+      <div style="display: flex; justify-content: space-between;">
+        <span style="color: var(--color-text-muted);">Dibuat oleh:</span>
+        <strong>{{ job.created_by or 'system' }}</strong>
+      </div>
+    </div>
+  </div>
+
+  <!-- Card 2: Metrik Baris Produk -->
+  <div class="card-kurma">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem; border-bottom: 1px solid var(--color-border-subtle); padding-bottom: 0.75rem;">
+      <h2 class="card-title" style="margin: 0; display: flex; align-items: center; gap: 0.45rem;">
+        {{ icon('product', 18, color='var(--color-primary)') }}
+        <span>Metrik Data Hasil</span>
+      </h2>
+    </div>
+    <div style="font-size: 0.88rem; line-height: 2; color: var(--color-text);">
+      <div style="display: flex; justify-content: space-between;">
+        <span style="color: var(--color-text-muted);">Baris Ditemukan:</span>
+        <strong>{{ job.rows_found }}</strong>
+      </div>
+      <div style="display: flex; justify-content: space-between;">
+        <span style="color: var(--color-text-muted);">Baris Berhasil Disimpan:</span>
+        <strong style="color: var(--color-success); font-weight: 800;">{{ job.rows_saved }}</strong>
+      </div>
+      <div style="display: flex; justify-content: space-between;">
+        <span style="color: var(--color-text-muted);">Baris Duplikat / Update:</span>
+        <strong>{{ job.rows_duplicate }}</strong>
+      </div>
+      <div style="display: flex; justify-content: space-between;">
+        <span style="color: var(--color-text-muted);">Baris Ditolak (Rejected):</span>
+        {% if job.rows_rejected > 0 %}
+          <strong style="color: var(--color-danger); font-weight: 800;">{{ job.rows_rejected }}</strong>
+        {% else %}
+          <span style="color: var(--color-text-muted);">0</span>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Card 3: Konfigurasi & Metode -->
+  <div class="card-kurma">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem; border-bottom: 1px solid var(--color-border-subtle); padding-bottom: 0.75rem;">
+      <h2 class="card-title" style="margin: 0; display: flex; align-items: center; gap: 0.45rem;">
+        {{ icon('settings', 18, color='var(--color-primary)') }}
+        <span>Konfigurasi Pipeline</span>
+      </h2>
+    </div>
+    <div style="font-size: 0.88rem; line-height: 2; color: var(--color-text);">
+      <div style="display: flex; justify-content: space-between;">
+        <span style="color: var(--color-text-muted);">Metode Scraping:</span>
+        <strong>{{ (job.meta or {}).get('revenue_source_method', 'product_filter') }}</strong>
+      </div>
+      <div style="display: flex; justify-content: space-between;">
+        <span style="color: var(--color-text-muted);">Terpotong Batas (Limit):</span>
+        <strong>{{ 'Ya (Truncated)' if (job.meta or {}).get('truncated') else 'Tidak' }}</strong>
+      </div>
+      <div style="display: flex; justify-content: space-between;">
+        <span style="color: var(--color-text-muted);">Bahasa Browser:</span>
+        <strong>{{ (job.meta or {}).get('ui_language', 'en') }}</strong>
+      </div>
+      <div style="display: flex; justify-content: space-between;">
+        <span style="color: var(--color-text-muted);">Mode Chrome:</span>
+        <strong>{{ 'Headless' if (job.meta or {}).get('headless') else 'Desktop (Visible)' }}</strong>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Error Summary (if any) -->
+{% if job.error_code or job.error_summary %}
+<div class="card-kurma-danger" style="margin-bottom: 2rem;">
+  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+    <div class="section-title-danger">
+      {{ icon('lightning', 20, color='#DC2626') }}
+      <span>Informasi Kegagalan Scraper</span>
+    </div>
+    <code style="background: #FEE2E2; color: #991B1B; padding: 0.2rem 0.5rem; border-radius: 4px; font-weight: 700;">{{ job.error_code }}</code>
+  </div>
+  <p style="color: #991B1B; font-size: 0.92rem; line-height: 1.6; margin: 0;">
+    {{ job.error_summary }}
+  </p>
+</div>
+{% endif %}
+
+<!-- Diagnostic Screenshots (Admin only) -->
+{% if current_user.role == 'admin' and screenshots %}
+<div class="card-kurma">
+  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem;">
+    <h2 class="card-title" style="margin: 0; display: flex; align-items: center; gap: 0.45rem;">
+      {{ icon('browser', 18, color='var(--color-primary)') }}
+      <span>Screenshot Diagnostik Chrome</span>
+    </h2>
+    <span style="font-size: 0.82rem; color: var(--color-text-muted);">
+      Tangkapan layar saat proses navigasi Playwright berlangsung
+    </span>
+  </div>
+  <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1.25rem;">
+    {% for sc in screenshots %}
+    <div style="border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: 0.75rem; background: var(--color-surface); box-shadow: 0 2px 8px rgba(0,0,0,0.03);">
+      <div style="font-size: 0.8rem; font-weight: 700; color: var(--color-sidebar); margin-bottom: 0.5rem; display: flex; justify-content: space-between;">
+        <span>Tahap: {{ sc.stage }}</span>
+      </div>
+      <a href="{{ url_for('static', filename='screenshots/' + sc.relative_path) }}" target="_blank">
+        <img src="{{ url_for('static', filename='screenshots/' + sc.relative_path) }}" alt="{{ sc.stage }}" style="width: 100%; height: auto; border-radius: var(--radius-sm); border: 1px solid var(--color-border-subtle); display: block;">
+      </a>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+{% endblock %}

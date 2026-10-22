@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+{% from "components/icons.html" import icon %}
+
+{% block title %}Login - Kurma Scraper{% endblock %}
+
+{% block auth_content %}
+<div class="card-kurma" style="width: 100%; max-width: 420px; padding: 2.5rem 2rem; margin: 1.5rem; box-shadow: 0 16px 40px rgba(7, 59, 50, 0.08); border: 1px solid var(--color-border);">
+  <div style="text-align: center; margin-bottom: 2rem;">
+    <!-- Brand Emblem SVG -->
+    <div style="display: inline-flex; align-items: center; justify-content: center; width: 64px; height: 64px; border-radius: 16px; background: linear-gradient(135deg, var(--color-sidebar) 0%, #0D4E40 100%); color: #34D399; margin-bottom: 1rem; box-shadow: 0 6px 18px rgba(7, 59, 50, 0.2);">
+      {{ icon('logo', 36, stroke=1.8, color='#34D399') }}
+    </div>
+    <h1 style="font-size: 1.5rem; font-weight: 800; color: var(--color-sidebar); margin-bottom: 0.25rem; letter-spacing: -0.01em;">
+      Kurma Kurasi
+    </h1>
+    <span style="font-size: 0.72rem; font-weight: 800; color: var(--color-primary); letter-spacing: 0.1em; text-transform: uppercase;">
+      SISTEM SCRAPING &amp; INTEL KALODATA
+    </span>
+  </div>
+
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      <div style="margin-bottom: 1.5rem;">
+        {% for category, message in messages %}
+          <div class="alert alert-{{ category }}" style="padding: 0.75rem 1rem; font-size: 0.85rem; border-radius: var(--radius-sm); border: 1px solid var(--color-danger-border); background: var(--color-danger-bg); color: var(--color-danger);">
+            <span>{{ message }}</span>
+          </div>
+        {% endfor %}
+      </div>
+    {% endif %}
+  {% endwith %}
+
+  <form method="POST" action="{{ url_for('auth.login') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+
+    <div class="form-group" style="margin-bottom: 1.25rem;">
+      <label class="form-label" for="username">Username</label>
+      <div class="input-with-icon">
+        <input type="text" id="username" name="username" class="form-input" placeholder="Masukkan username admin" required autofocus style="padding-left: 2.5rem;">
+        <span style="position: absolute; left: 0.85rem; color: var(--color-text-muted); display: flex; align-items: center; pointer-events: none;">
+          {{ icon('settings', 16) }}
+        </span>
+      </div>
+    </div>
+
+    <div class="form-group" style="margin-bottom: 1.75rem;">
+      <label class="form-label" for="password">Password</label>
+      <div class="input-with-icon">
+        <input type="password" id="password" name="password" class="form-input" placeholder="••••••••" required style="padding-left: 2.5rem;">
+        <span style="position: absolute; left: 0.85rem; color: var(--color-text-muted); display: flex; align-items: center; pointer-events: none;">
+          {{ icon('lock', 16) }}
+        </span>
+      </div>
+    </div>
+
+    <button type="submit" class="btn-kurma" style="width: 100%; height: 46px; font-size: 0.95rem; font-weight: 800; border-radius: var(--radius-sm); justify-content: center;">
+      <span>Masuk ke Dashboard</span>
+      {{ icon('arrow-right', 16) }}
+    </button>
+  </form>
+
+  <div style="margin-top: 2rem; text-align: center; border-top: 1px solid var(--color-border-subtle); padding-top: 1.25rem;">
+    <span style="font-size: 0.75rem; color: var(--color-text-muted); display: flex; align-items: center; justify-content: center; gap: 0.4rem;">
+      {{ icon('lock', 13, color='var(--color-text-muted)') }}
+      <span>Sistem Terproteksi &bull; Akses Terbatas Internal</span>
+    </span>
+  </div>
+</div>
+{% endblock %}

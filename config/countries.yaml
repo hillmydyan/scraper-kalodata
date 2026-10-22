@@ -1,0 +1,24 @@
+countries:
+  ID:
+    name: "Indonesia"
+    currency_code: "IDR"
+    currency_symbol: "Rp"
+    region_label: "Indonesia"
+    expected_indicator: "ID"
+  MY:
+    name: "Malaysia"
+    currency_code: "MYR"
+    currency_symbol: "RM"
+    region_label: "Malaysia"
+    expected_indicator: "MY"
+  TH:
+    name: "Thailand"
+    currency_code: "THB"
+    currency_symbol: "฿"
+    region_label: "Thailand"
+    expected_indicator: "TH"
+
+execution_order:
+  - "ID"
+  - "MY"
+  - "TH"

@@ -1,0 +1,51 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+*.zip
+
+# Virtualenv
+.env
+.env.local
+.env.*.local
+
+# Runtime directory (ignore data, profile browser, screenshots, exports, locks)
+runtime/*
+!runtime/kalodata_session.json
+
+# Playwright & Browser sessions
+.playwright/
+
+# IDE / Editor
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Testing / Coverage
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Logs
+*.log

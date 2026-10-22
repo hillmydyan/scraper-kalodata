@@ -1,0 +1,19 @@
+# Catatan: Nilai label aktual wajib diverifikasi di Tahap 2 (§6.2)
+categories:
+  ID:
+    category_path:
+      - "Womenswear & Underwear"
+      - "Women's Bottoms"
+  MY:
+    category_path:
+      - "Womenswear & Underwear"
+      - "Women's Bottoms"
+  TH:
+    category_path:
+      - "Womenswear & Underwear"
+      - "Women's Bottoms"
+
+revenue_sources:
+  video:
+    label: "Video"
+    fallback_allowed: true

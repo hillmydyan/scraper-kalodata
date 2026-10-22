@@ -1,0 +1,192 @@
+{% extends "base.html" %}
+{% from "components/icons.html" import icon %}
+
+{% block title %}Preview Data - Kurma Scraper{% endblock %}
+
+{% block content %}
+<div style="margin-bottom: 2rem; display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 1rem;">
+  <div>
+    <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.35rem;">
+      {% if job.country_code == 'ID' %}
+        <span class="country-badge" style="background:#FEE2E2; color:#DC2626;">ID</span>
+      {% elif job.country_code == 'MY' %}
+        <span class="country-badge" style="background:#DBEAFE; color:#2563EB;">MY</span>
+      {% elif job.country_code == 'TH' %}
+        <span class="country-badge" style="background:#FEF3C7; color:#D97706;">TH</span>
+      {% else %}
+        <span class="country-badge">{{ job.country_code }}</span>
+      {% endif %}
+      <h1 style="font-size: 1.5rem; font-weight: 800; color: var(--color-sidebar); margin: 0;">
+        {% if job.module == 'creator' %}Preview Hasil Kreator{% else %}Preview 50 Katalog Produk Teratas{% endif %}
+      </h1>
+      <span class="status-pill status-{{ job.status }}">{{ job.status }}</span>
+    </div>
+    <p style="color: var(--color-text-muted); font-size: 0.88rem; margin: 0;">
+      Modul: <strong>{{ (job.module or 'product')|upper }}</strong> &bull; Negara: <strong>{{ job.country_code }}</strong> &bull; Periode: <strong>{{ job.period_start }}</strong>
+    </p>
+  </div>
+  <div>
+    <a href="{{ url_for('results.index') }}" class="btn-kurma-secondary">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="19" y1="12" x2="5" y2="12"></line>
+        <polyline points="12 19 5 12 12 5"></polyline>
+      </svg>
+      <span>Kembali ke Halaman Hasil</span>
+    </a>
+  </div>
+</div>
+
+<div class="card-kurma">
+  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem;">
+    <h2 class="card-title" style="margin: 0; display: flex; align-items: center; gap: 0.45rem;">
+      {{ icon('results', 18, color='var(--color-primary)') }}
+      <span>Baris Data Terkoleksi (Maks 50 Baris Preview)</span>
+    </h2>
+    <span style="font-size: 0.82rem; color: var(--color-text-muted);">
+      Total ditampilkan: <strong>{{ results|length }}</strong> baris
+    </span>
+  </div>
+
+  <div class="table-wrapper">
+    <table class="kurma-table">
+      <thead>
+        <tr>
+          {% if job.module == 'creator' %}
+            <th>Nama Kreator</th>
+            <th>Urutan</th>
+            <th>ID Produk</th>
+            <th>Nama Produk</th>
+            <th>Nama Toko</th>
+            <th>Pendapatan</th>
+            <th>Penjualan</th>
+            <th>Komisi</th>
+          {% else %}
+            <th>ID Produk</th>
+            <th>Nama Produk</th>
+            <th>Nama Toko</th>
+            <th>Pendapatan</th>
+            <th>Penjualan</th>
+            <th>Komisi</th>
+            <th>Link Video</th>
+            <th>Metode Video</th>
+          {% endif %}
+        </tr>
+      </thead>
+      <tbody>
+        {% if results %}
+          {% for r in results %}
+          <tr>
+            {% if job.module == 'creator' %}
+              <td>
+                <strong style="color: var(--color-sidebar);">{{ r.creator_name }}</strong>
+              </td>
+              <td>
+                <span style="display:inline-flex; align-items: center; padding: 0.2rem 0.6rem; background: var(--color-primary-soft); color: var(--color-primary); border-radius: var(--radius-full); font-size: 0.75rem; font-weight: 700;">
+                  #{{ r.product_rank or '-' }}
+                </span>
+              </td>
+              <td>
+                <code style="background: #F1F5F9; color: var(--color-sidebar); padding: 0.2rem 0.45rem; border-radius: 4px; font-size: 0.8rem;">{{ r.source_product_id }}</code>
+              </td>
+              <td style="max-width: 280px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="{{ r.product_name }}">
+                {% if r.product_url %}
+                  <a href="{{ r.product_url }}" target="_blank" style="color: var(--color-primary); font-weight: 600; text-decoration: underline;">{{ r.product_name }}</a>
+                {% else %}
+                  {{ r.product_name }}
+                {% endif %}
+              </td>
+              <td style="color: var(--color-text-muted);">{{ r.shop_name or '-' }}</td>
+              <td>
+                {% if r.revenue_value is not none %}
+                  <strong style="color: var(--color-text);">{{ r.currency_code }} {{ "{:,.2f}".format(r.revenue_value) }}</strong>
+                {% else %}
+                  {{ r.revenue_raw or '-' }}
+                {% endif %}
+              </td>
+              <td>
+                <strong>{{ "{:,}".format(r.sales_value|int) if r.sales_value is not none else (r.sales_raw or '-') }}</strong>
+              </td>
+              <td>
+                {% if r.commission_rate is not none %}
+                  {% set c_pct = (r.commission_rate * 100)|round(1) %}
+                  {% if c_pct <= 7.0 %}
+                    <span style="color: #475569; font-weight: 700;">{{ c_pct }}% (Rendah)</span>
+                  {% elif c_pct <= 10.0 %}
+                    <span style="color: #D97706; font-weight: 700;">{{ c_pct }}% (Sedang)</span>
+                  {% else %}
+                    <span style="color: #059669; font-weight: 700;">{{ c_pct }}% (Tinggi)</span>
+                  {% endif %}
+                {% else %}
+                  {{ r.commission_raw or '-' }}
+                {% endif %}
+              </td>
+            {% else %}
+              <td>
+                <code style="background: #F1F5F9; color: var(--color-sidebar); padding: 0.2rem 0.45rem; border-radius: 4px; font-size: 0.8rem;">{{ r.source_product_id }}</code>
+              </td>
+              <td style="max-width: 280px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="{{ r.product_name }}">
+                {% if r.product_url %}
+                  <a href="{{ r.product_url }}" target="_blank" style="color: var(--color-primary); font-weight: 600; text-decoration: underline;">{{ r.product_name }}</a>
+                {% else %}
+                  {{ r.product_name }}
+                {% endif %}
+              </td>
+              <td style="color: var(--color-text-muted);">{{ r.shop_name or '-' }}</td>
+              <td>
+                {% if r.revenue_value is not none %}
+                  <strong style="color: var(--color-text);">{{ r.currency_code }} {{ "{:,.2f}".format(r.revenue_value) }}</strong>
+                  {% if r.revenue_is_abbreviated %}
+                    <span style="font-size: 0.72rem; color: var(--color-text-muted);">(est)</span>
+                  {% endif %}
+                {% else %}
+                  -
+                {% endif %}
+              </td>
+              <td>
+                <strong>{{ "{:,}".format(r.sales_value|int) if r.sales_value is not none else '-' }}</strong>
+              </td>
+              <td>
+                {% if r.commission_rate is not none %}
+                  {% set c_pct = (r.commission_rate * 100)|round(1) %}
+                  {% if c_pct <= 7.0 %}
+                    <span style="color: #475569; font-weight: 700;">{{ c_pct }}% (Rendah)</span>
+                  {% elif c_pct <= 10.0 %}
+                    <span style="color: #D97706; font-weight: 700;">{{ c_pct }}% (Sedang)</span>
+                  {% else %}
+                    <span style="color: #059669; font-weight: 700;">{{ c_pct }}% (Tinggi)</span>
+                  {% endif %}
+                {% else %}
+                  -
+                {% endif %}
+              </td>
+              <td>
+                {% if r.video_url %}
+                  <a href="{{ r.video_url }}" target="_blank" style="display: inline-flex; align-items: center; gap: 0.25rem; color: var(--color-primary); font-weight: 700; text-decoration: underline;">
+                    <span>Lihat Video</span>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                      <line x1="7" y1="17" x2="17" y2="7"></line>
+                      <polyline points="7 7 17 7 17 17"></polyline>
+                    </svg>
+                  </a>
+                {% else %}
+                  <span style="color: var(--color-text-muted); font-size: 0.82rem;">Tidak ada</span>
+                {% endif %}
+              </td>
+              <td>
+                <span class="status-pill status-SUCCESS" style="font-size: 0.7rem;">{{ r.video_selection_method }}</span>
+              </td>
+            {% endif %}
+          </tr>
+          {% endfor %}
+        {% else %}
+          <tr>
+            <td colspan="8" style="text-align: center; padding: 2.5rem; color: var(--color-text-muted);">
+              Belum ada baris data untuk job ini.
+            </td>
+          </tr>
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

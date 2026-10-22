@@ -1,0 +1,18 @@
+[Unit]
+Description=Kalodata Scraper Celery Beat Scheduler
+After=network.target docker.service
+Wants=docker.service
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/kalodata
+EnvironmentFile=/opt/kalodata/.env
+Environment=PYTHONPATH=/opt/kalodata
+ExecStart=/opt/kalodata/venv/bin/celery -A app.tasks.celery_app beat --loglevel=INFO
+Restart=always
+RestartSec=10
+TimeoutStopSec=30
+
+[Install]
+WantedBy=multi-user.target
