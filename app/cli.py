@@ -35,12 +35,16 @@ def cmd_create_admin(args):
         username = args.username
         password = args.password
 
+        password_hash = ph.hash(password)
         existing = db.query(User).filter_by(username=username).first()
         if existing:
-            print(f"Error: User '{username}' already exists.")
+            existing.password_hash = password_hash
+            existing.is_active = True
+            existing.role = "admin"
+            db.commit()
+            print(f"Password untuk admin user '{username}' berhasil diperbarui / di-reset!")
             return
 
-        password_hash = ph.hash(password)
         admin = User(
             username=username,
             password_hash=password_hash,
