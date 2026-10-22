@@ -34,29 +34,32 @@ class SessionManager:
         except Exception as e:
             return "ERROR", f"Network error during session validation: {str(e)}"
 
-        # Check for genuine Cloudflare challenge block pages and allow time to auto-clear
-        for _ in range(6):
+        # Check for genuine Cloudflare challenge block pages and allow time to auto-clear or click
+        for _ in range(8):
             page_title = (page.title() or "").lower()
-            if "just a moment" in page_title or "attention required" in page_title:
+            if "just a moment" in page_title or "attention required" in page_title or "cloudflare" in page_title:
                 logger.info("Cloudflare challenge page in progress, waiting for verification...", title=page_title)
-                page.wait_for_timeout(1500)
+                try:
+                    # Attempt click on turnstile checkbox inside any frame
+                    for frame in page.frames:
+                        if "cloudflare" in frame.url or "challenges" in frame.url:
+                            checkbox = frame.locator("input[type='checkbox'], .ctp-checkbox-label, #challenge-stage").first
+                            if checkbox.is_visible(timeout=1000):
+                                logger.info("Clicking Cloudflare challenge checkbox in frame...")
+                                checkbox.click(force=True)
+                                break
+                except Exception:
+                    pass
+                page.wait_for_timeout(2000)
             else:
                 break
 
         page_title = (page.title() or "").lower()
         if "just a moment" in page_title or "attention required" in page_title:
-            # If session file exists with verified cookies, allow session to proceed as READY
-            session_file = settings.RUNTIME_DIR / "kalodata_session.json"
-            if session_file.exists():
-                logger.info("Cloudflare challenge active on initial load, but verified cookies are injected. Marking READY.")
-                return "READY", "Session cookies aktif (Kalodata cookies berhasil di-inject)."
-            return "ACCESS_RESTRICTED", "Cloudflare verification challenge page detected."
+            return "ACCESS_RESTRICTED", "Cloudflare verification challenge page detected. Browser tertahan di halaman Cloudflare (Just a moment...)."
 
         try:
             if page.locator("text='Verify you are human'").first.is_visible(timeout=500):
-                session_file = settings.RUNTIME_DIR / "kalodata_session.json"
-                if session_file.exists():
-                    return "READY", "Session cookies aktif."
                 return "ACCESS_RESTRICTED", "Cloudflare Turnstile challenge detected."
         except Exception:
             pass

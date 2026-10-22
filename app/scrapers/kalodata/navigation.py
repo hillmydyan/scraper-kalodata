@@ -146,13 +146,21 @@ class KalodataNavigator:
             pass
 
         # 3. Verify via URL parameter/path
-        current_url = self.page.url.upper()
-        if expected_indicator.upper() in current_url:
+        current_url = self.page.url
+        if expected_indicator.upper() in current_url.upper():
             logger.info("Region switch verified via URL", country=country_code, url=current_url)
             return True
 
+        current_title = self.page.title() or ""
+        logger.warning(
+            "Region switch verification failed",
+            country=country_code,
+            current_url=current_url,
+            current_title=current_title
+        )
+
         raise NavigationError(
-            f"Failed to verify region switch to {country_code}. Expected {expected_indicator} or {region_label}",
+            f"Failed to verify region switch to {country_code}. Expected {expected_indicator} or {region_label} (Current URL: {current_url}, Title: {current_title})",
             error_code="COUNTRY_MISMATCH"
         )
 

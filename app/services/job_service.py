@@ -479,9 +479,19 @@ class JobService:
 
             except NavigationError as ne:
                 logger.warning("Navigation error during scraping", error=str(ne), code=ne.error_code)
+                try:
+                    if 'page' in locals() and page:
+                        scraper.take_screenshot(page, f"nav_error_{job.country_code}", job.id)
+                except Exception:
+                    pass
                 cls.finalize_job(db, job.id, status="FAILED", error_code=ne.error_code, error_summary=str(ne))
             except Exception as e:
                 logger.error("Job execution failed", exc_info=True)
+                try:
+                    if 'page' in locals() and page:
+                        scraper.take_screenshot(page, "crash", job.id)
+                except Exception:
+                    pass
                 cls.finalize_job(db, job.id, status="FAILED", error_code="UNKNOWN", error_summary=str(e))
             finally:
                 scraper.close_browser()

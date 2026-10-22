@@ -134,8 +134,8 @@ class BaseScraper:
         if headless is None:
             headless = settings.KALODATA_HEADLESS
 
-        if channel is None and sys.platform == "win32":
-            channel = "chrome"
+        if channel is None:
+            channel = os.getenv("CHROME_CHANNEL", "chrome")
 
         env = os.environ.copy()
         if headless:
