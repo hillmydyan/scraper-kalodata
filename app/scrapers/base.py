@@ -172,11 +172,31 @@ class BaseScraper:
         try:
             self.browser_context = self.playwright.chromium.launch_persistent_context(**kwargs)
         except Exception as ex:
-            if channel:
-                logger.warning("Failed to launch with channel, falling back to default chromium", error=str(ex))
+            err_msg = str(ex)
+            # Fallback 1: If launched with channel (e.g. system chrome) and failed, try standard chromium
+            if kwargs.get("channel"):
+                logger.warning("Failed to launch with channel, falling back to default chromium", error=err_msg)
                 kwargs.pop("channel", None)
-                self.browser_context = self.playwright.chromium.launch_persistent_context(**kwargs)
-            else:
+                try:
+                    self.browser_context = self.playwright.chromium.launch_persistent_context(**kwargs)
+                except Exception as inner_ex:
+                    ex = inner_ex
+                    err_msg = str(inner_ex)
+
+            # Fallback 2: If headed launch failed (e.g. missing XServer or $DISPLAY), fallback automatically to headless
+            if self.browser_context is None and not kwargs.get("headless"):
+                logger.warning(
+                    "Headed browser launch failed (missing XServer or $DISPLAY). Falling back automatically to headless=True...",
+                    error=err_msg
+                )
+                kwargs["headless"] = True
+                kwargs.pop("channel", None)
+                try:
+                    self.browser_context = self.playwright.chromium.launch_persistent_context(**kwargs)
+                except Exception as head_ex:
+                    logger.error("Headless fallback also failed", error=str(head_ex))
+                    raise head_ex
+            elif self.browser_context is None:
                 raise ex
 
         # Auto-import portable session cookies if kalodata_session.json exists

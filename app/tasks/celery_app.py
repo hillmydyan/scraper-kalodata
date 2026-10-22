@@ -177,7 +177,7 @@ def scrape_country_job(job_id: str):
     scraper = BaseScraper(profile_label=profile_label)
     try:
         scraper.acquire_lock()
-        context = scraper.launch_browser()
+        context = scraper.launch_browser(headless=True)
         page = context.new_page()
 
         nav = KalodataNavigator(page)

@@ -4,6 +4,7 @@ Loads environment variables (.env) and YAML configurations from config/ director
 """
 
 import os
+import sys
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 import yaml
@@ -55,7 +56,7 @@ class Settings:
     
     # Browser & Display
     KALODATA_DISPLAY: str = os.getenv("KALODATA_DISPLAY", ":1")
-    KALODATA_HEADLESS: bool = os.getenv("KALODATA_HEADLESS", "false").lower() == "true"
+    KALODATA_HEADLESS: bool = os.getenv("KALODATA_HEADLESS", "true" if sys.platform != "win32" else "false").lower() == "true"
     _raw_chrome_dir = os.getenv("CHROME_USER_DATA_DIR", "runtime/chrome_profile")
     CHROME_USER_DATA_DIR: str = str((BASE_DIR / _raw_chrome_dir).resolve()) if not Path(_raw_chrome_dir).is_absolute() else _raw_chrome_dir
     

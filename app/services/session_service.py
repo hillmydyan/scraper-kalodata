@@ -90,7 +90,7 @@ class SessionService:
         scraper = BaseScraper(profile_label=profile.profile_dir_name)
         try:
             scraper.acquire_lock()
-            context = scraper.launch_browser()
+            context = scraper.launch_browser(headless=True)
             page = context.new_page()
             status, message = SessionManager.validate_session(page, timeout_sec=25)
 
