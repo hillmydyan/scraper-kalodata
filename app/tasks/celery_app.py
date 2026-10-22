@@ -8,7 +8,7 @@ from celery import Celery
 from celery.schedules import crontab
 import structlog
 
-from app.config import settings
+from app.config import settings, APP_CONFIG
 from app.models import SessionLocal
 from app.models.entities import ScrapeRun, ScrapeJob
 from app.services.job_service import JobService
@@ -40,7 +40,7 @@ celery_app.conf.update(
 celery_app.conf.beat_schedule = {
     "daily-kalodata-run": {
         "task": "app.tasks.celery_app.run_daily_pipeline",
-        "schedule": crontab(hour=settings.APP_CONFIG.get("app", {}).get("schedule_hour_wib", 1), minute=0),
+        "schedule": crontab(hour=APP_CONFIG.get("app", {}).get("schedule_hour_wib", 1), minute=0),
     },
     "check-custom-schedule": {
         "task": "app.tasks.celery_app.check_and_run_scheduled_pipeline",

@@ -35,6 +35,9 @@ NUMBER_FORMATS_CONFIG = load_yaml("number_formats.yaml").get("number_formats", {
 
 
 class Settings:
+    APP_CONFIG: Dict[str, Any] = APP_CONFIG
+    COUNTRIES_CONFIG: Dict[str, Any] = COUNTRIES_CONFIG
+
     # Environment
     APP_ENV: str = os.getenv("APP_ENV", "production")
     SECRET_KEY: str = os.getenv("SECRET_KEY", "default-dev-secret-key-change-in-prod")
