@@ -3,6 +3,8 @@ Job and Run service managing the lifecycle and state machine of scrape jobs.
 Follows rules in PRD §8.2, §8.3, §8.5, and §11.
 """
 
+import os
+import sys
 import uuid
 from datetime import datetime, date, timedelta, timezone
 from typing import Optional, List, Dict, Any
@@ -494,33 +496,56 @@ class JobService:
         limit: int = 2000,
         headless: Optional[bool] = None
     ):
-        """Dispatches run execution in a background thread for instant response."""
+        """Dispatches run execution via Celery worker or background thread."""
         import threading
         from app.models import SessionLocal
 
-        def worker_thread():
+        if headless is None:
+            headless = True if sys.platform != "win32" else False
+
+        # Attempt Celery dispatch first
+        dispatched_to_celery = False
+        try:
+            from app.tasks.celery_app import scrape_country_job
             db = SessionLocal()
             try:
-                run = db.get(ScrapeRun, run_id)
-                if not run:
-                    return
-                for job in run.jobs:
-                    if job.status == "PENDING":
-                        cls.execute_job_now(job.id, limit=limit, headless=headless)
-                run.status = "COMPLETED"
-                run.finished_at = datetime.now(timezone.utc)
-                db.commit()
-
-                # Automatically trigger retention cleanup
-                try:
-                    from app.services.retention_service import RetentionService
-                    RetentionService.cleanup_old_data(db)
-                except Exception as clean_err:
-                    logger.warning("Automatic retention cleanup warning", error=str(clean_err))
-            except Exception as e:
-                logger.error("Background worker thread error", error=str(e))
+                jobs = db.query(ScrapeJob).filter_by(run_id=run_id).order_by(ScrapeJob.created_at).all()
+                if jobs:
+                    for job in jobs:
+                        if job.status == "PENDING":
+                            scrape_country_job.delay(job.id, limit=limit, headless=headless)
+                    dispatched_to_celery = True
+                    logger.info("Dispatched jobs to Celery queue", run_id=run_id, count=len(jobs))
             finally:
                 db.close()
+        except Exception as cel_err:
+            logger.warning("Celery dispatch unavailable, using background thread fallback", error=str(cel_err))
 
-        t = threading.Thread(target=worker_thread, daemon=True)
-        t.start()
+        if not dispatched_to_celery:
+            def worker_thread():
+                db = SessionLocal()
+                try:
+                    jobs = db.query(ScrapeJob).filter_by(run_id=run_id).order_by(ScrapeJob.created_at).all()
+                    logger.info("Worker thread starting jobs execution", run_id=run_id, count=len(jobs))
+                    for job in jobs:
+                        if job.status == "PENDING":
+                            cls.execute_job_now(job.id, limit=limit, headless=headless)
+                    run = db.get(ScrapeRun, run_id)
+                    if run:
+                        run.status = "COMPLETED"
+                        run.finished_at = datetime.now(timezone.utc)
+                        db.commit()
+
+                    # Automatically trigger retention cleanup
+                    try:
+                        from app.services.retention_service import RetentionService
+                        RetentionService.cleanup_old_data(db)
+                    except Exception as clean_err:
+                        logger.warning("Automatic retention cleanup warning", error=str(clean_err))
+                except Exception as e:
+                    logger.error("Background worker thread error", error=str(e))
+                finally:
+                    db.close()
+
+            t = threading.Thread(target=worker_thread, daemon=True)
+            t.start()

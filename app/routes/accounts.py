@@ -96,6 +96,23 @@ def validate(profile_id: str):
         db.close()
 
 
+@accounts_bp.route("/accounts/force-ready/<profile_id>", methods=["POST"])
+@admin_required
+def force_ready(profile_id: str):
+    from datetime import datetime, timezone
+    db = SessionLocal()
+    try:
+        profile = db.get(AccountProfile, profile_id)
+        if profile:
+            profile.session_status = "READY"
+            profile.last_validated_at = datetime.now(timezone.utc)
+            db.commit()
+            flash("Status profil berhasil disetel ke READY! Siap untuk scraping.", "success")
+        return redirect(url_for("accounts.index"))
+    finally:
+        db.close()
+
+
 @accounts_bp.route("/accounts/open-login/<profile_id>", methods=["POST"])
 @admin_required
 def open_login(profile_id: str):

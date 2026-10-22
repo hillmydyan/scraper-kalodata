@@ -152,119 +152,13 @@ def run_daily_pipeline():
 
 
 @celery_app.task(name="app.tasks.celery_app.scrape_country_job")
-def scrape_country_job(job_id: str):
+def scrape_country_job(job_id: str, limit: int = 2000, headless: Optional[bool] = None):
     """Executes single country scrape job."""
-    from app.scrapers.base import BaseScraper
-    from app.scrapers.kalodata.navigation import KalodataNavigator
-    from app.scrapers.kalodata.product_list import ProductListScraper
-
-    db = SessionLocal()
-    job = db.get(ScrapeJob, job_id)
-    if not job:
-        return {"error": "Job not found"}
-
-    job.status = "RUNNING"
-    job.started_at = datetime.now(timezone.utc)
-    db.commit()
-
-    profile_label = "indo"
-    if job.account_profile_id:
-        from app.models.entities import AccountProfile
-        acc_p = db.get(AccountProfile, job.account_profile_id)
-        if acc_p and acc_p.profile_dir_name:
-            profile_label = acc_p.profile_dir_name
-
-    scraper = BaseScraper(profile_label=profile_label)
-    try:
-        scraper.acquire_lock()
-        context = scraper.launch_browser(headless=True)
-        page = context.new_page()
-
-        nav = KalodataNavigator(page)
-        nav.ensure_ui_language(settings.KALODATA_UI_LANGUAGE)
-
-        if getattr(job, "module", "product") == "creator":
-            from app.scrapers.kalodata.creator_scraper import CreatorScraper
-
-            page.goto(f"{settings.KALODATA_BASE_URL.rstrip('/')}/creator", wait_until="domcontentloaded", timeout=30000)
-            page.wait_for_timeout(2000)
-            nav.switch_and_verify_region(job.country_code)
-
-            creator_scraper = CreatorScraper(page, job.country_code)
-            creator_scraper.apply_filters()
-
-            min_rev = getattr(settings, "MIN_CREATOR_REVENUE_IDR", 4000000.0)
-            scrape_res = creator_scraper.scrape_creators(
-                max_creators=None,
-                min_revenue=min_rev,
-                products_per_creator=3,
-                period_date=job.period_start
-            )
-
-            items = scrape_res["items"]
-            JobService.upsert_creator_results(db, job.id, job.country_code, job.period_start, items)
-            job.rows_duplicate = 0
-            job.rows_found = scrape_res["total_creators"]
-            job.rows_saved = len(items)
-            job.rows_rejected = 0
-
-            final_status = "SUCCESS" if items else "NO_DATA"
-            JobService.finalize_job(
-                db, job.id,
-                status=final_status,
-                meta_updates={"revenue_source_method": "creator_filter"}
-            )
-
-            # Trigger Excel export
-            ExportService.export_job_results(db, job.id)
-            return {"job_id": job.id, "status": final_status, "saved": len(items)}
-        else:
-            nav.switch_and_verify_region(job.country_code)
-            nav.apply_date_range(job.period_start, job.period_end)
-            nav.apply_category_filter(job.country_code)
-            rev_method = nav.apply_revenue_source_filter()
-
-            list_scraper = ProductListScraper(page, job.country_code)
-            min_sales = getattr(settings, "MIN_PRODUCT_SALES", 50)
-            res = list_scraper.scrape_products(
-                max_limit=settings.MAX_PRODUCTS_PER_COUNTRY,
-                min_sales=min_sales,
-                revenue_source_method=rev_method
-            )
-
-            items = res["items"]
-            rejected = res["rejected"]
-
-            if rejected:
-                JobService.record_rejected_rows(db, job.id, rejected)
-
-            dups = JobService.upsert_product_results(db, job.id, job.country_code, job.period_start, items)
-            job.rows_duplicate = dups
-            job.rows_found = res["total_scanned"]
-            job.rows_saved = len(items)
-            job.rows_rejected = len(rejected)
-
-            final_status = "SUCCESS" if items else "NO_DATA"
-            if res["is_truncated"]:
-                final_status = "PARTIAL"
-
-            JobService.finalize_job(
-                db, job.id,
-                status=final_status,
-                meta_updates={"revenue_source_method": rev_method}
-            )
-
-            # Trigger Excel export
-            ExportService.export_job_results(db, job.id)
-            return {"job_id": job.id, "status": final_status, "saved": len(items)}
-    except Exception as e:
-        logger.error("Job failed with error", job_id=job_id, error=str(e))
-        JobService.finalize_job(db, job.id, status="FAILED", error_code="UNKNOWN", error_summary=str(e))
-        return {"job_id": job.id, "status": "FAILED", "error": str(e)}
-    finally:
-        scraper.close_browser()
-        scraper.release_lock()
-        db.close()
+    from app.services.job_service import JobService
+    if headless is None:
+        headless = True
+    JobService.execute_job_now(job_id, limit=limit, headless=headless)
+    return {"job_id": job_id, "status": "FINISHED"}
 
 
 @celery_app.task(name="app.tasks.celery_app.run_cleanup")

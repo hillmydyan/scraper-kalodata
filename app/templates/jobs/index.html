@@ -159,10 +159,10 @@
       <div class="form-group">
         <label class="form-label" for="manual_browser">Tampilan Browser (Lokal)</label>
         <select id="manual_browser" name="headless" class="form-select">
-          <option value="false" {% if (manual_config or {}).get('headless') != 'true' %}selected{% endif %}>Google Chrome (Desktop Visible)</option>
-          <option value="true" {% if (manual_config or {}).get('headless') == 'true' %}selected{% endif %}>Headless (Latar Belakang)</option>
+          <option value="true" {% if (manual_config or {}).get('headless') != 'false' %}selected{% endif %}>Headless (Latar Belakang - Rekomendasi VPS)</option>
+          <option value="false" {% if (manual_config or {}).get('headless') == 'false' %}selected{% endif %}>Google Chrome (Desktop Visible)</option>
         </select>
-        <div class="field-hint">Buka window Google Chrome langsung di layar komputer.</div>
+        <div class="field-hint">Gunakan Headless untuk server VPS tanpa display desktop.</div>
       </div>
     </div>
 
@@ -239,10 +239,16 @@
                   {{ icon('eye', 14) }}
                   <span>Detail</span>
                 </a>
-                {% if j.status == 'RUNNING' and current_user.role == 'admin' %}
+                {% if j.status in ['RUNNING', 'PENDING'] and current_user.role == 'admin' %}
                 <form method="POST" action="{{ url_for('jobs.cancel', job_id=j.id) }}" style="display:inline;">
                   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-                  <button type="submit" class="btn-kurma-danger" style="padding: 0.35rem 0.75rem; font-size: 0.8rem;">Batal</button>
+                  <button type="submit" class="btn-kurma-danger" style="padding: 0.35rem 0.75rem; font-size: 0.8rem;" title="Batalkan Job">Batal</button>
+                </form>
+                {% endif %}
+                {% if j.status in ['PENDING', 'FAILED'] and current_user.role == 'admin' %}
+                <form method="POST" action="{{ url_for('jobs.retry_job', job_id=j.id) }}" style="display:inline;">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                  <button type="submit" class="btn-kurma" style="padding: 0.35rem 0.75rem; font-size: 0.8rem;" title="Jalankan Job Ini">Jalankan</button>
                 </form>
                 {% endif %}
               </div>

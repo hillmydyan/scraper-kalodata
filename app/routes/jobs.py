@@ -57,7 +57,7 @@ def index():
                 "limit": schedule_config.get("target_limit", 200),
                 "module": "creator",
                 "country": "ID",
-                "headless": "false"
+                "headless": "true"
             }
 
         return render_template(
@@ -223,11 +223,36 @@ def cancel(job_id: str):
     db = SessionLocal()
     try:
         job = db.get(ScrapeJob, job_id)
-        if job and job.status == "RUNNING":
+        if job and job.status in ("RUNNING", "PENDING"):
             job.status = "CANCELLED"
             job.finished_at = datetime.now(timezone.utc)
             db.commit()
             flash("Job berhasil dibatalkan.", "info")
+        return redirect(url_for("jobs.index"))
+    finally:
+        db.close()
+
+
+@jobs_bp.route("/jobs/retry/<job_id>", methods=["POST"])
+@admin_required
+def retry_job(job_id: str):
+    db = SessionLocal()
+    try:
+        job = db.get(ScrapeJob, job_id)
+        if not job:
+            flash("Job tidak ditemukan.", "danger")
+            return redirect(url_for("jobs.index"))
+
+        job.status = "PENDING"
+        job.started_at = None
+        job.finished_at = None
+        job.error_code = None
+        job.error_summary = None
+        db.commit()
+
+        run_id = job.run_id or job.id
+        JobService.dispatch_run_in_background(run_id, limit=200, headless=True)
+        flash(f"Job scraping ({job.country_code}) berhasil dipicu ulang di latar belakang!", "success")
         return redirect(url_for("jobs.index"))
     finally:
         db.close()

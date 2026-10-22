@@ -190,18 +190,25 @@
       </div>
     </div>
     <div style="display: flex; gap: 0.75rem; flex-wrap: wrap;">
-      <form method="POST" action="{{ url_for('accounts.open_login', profile_id=primary_profile.id) }}" style="flex: 1; min-width: 180px;">
+      <form method="POST" action="{{ url_for('accounts.open_login', profile_id=primary_profile.id) }}" style="flex: 1; min-width: 170px;">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
         <button type="submit" class="btn-kurma" style="width: 100%; padding: 0.6rem 1rem; font-size: 0.85rem; justify-content: center;">
           {{ icon('browser', 15) }}
           <span>Buka Browser Login</span>
         </button>
       </form>
-      <form method="POST" action="{{ url_for('accounts.validate', profile_id=primary_profile.id) }}" style="flex: 1; min-width: 150px;">
+      <form method="POST" action="{{ url_for('accounts.validate', profile_id=primary_profile.id) }}" style="flex: 1; min-width: 170px;">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
         <button type="submit" class="btn-kurma-secondary" style="width: 100%; justify-content: center; padding: 0.6rem 1rem; font-size: 0.85rem;">
           {{ icon('refresh', 15) }}
           <span>Validasi Sesi Browser</span>
+        </button>
+      </form>
+      <form method="POST" action="{{ url_for('accounts.force_ready', profile_id=primary_profile.id) }}" style="flex: 1; min-width: 170px;">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+        <button type="submit" class="btn-kurma-secondary" style="width: 100%; justify-content: center; padding: 0.6rem 1rem; font-size: 0.85rem; color: var(--color-success); border-color: rgba(16, 185, 129, 0.4);" title="Gunakan session cookie VIP yang sudah tersimpan">
+          {{ icon('check', 15) }}
+          <span>Set Sesi Aktif (READY)</span>
         </button>
       </form>
     </div>
