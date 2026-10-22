@@ -2,14 +2,15 @@
 # Script to launch virtual X display and VNC server for Kalodata scraper
 set -e
 
-DISPLAY_NUM=":1"
-RFB_PORT="5901"
+DISPLAY_NUM="${VNC_DISPLAY:-:2}"
+RFB_PORT="${VNC_PORT:-5902}"
 GEOMETRY="1440x900x24"
+DISP_ID="${DISPLAY_NUM#:}"
 
 echo "=== Memulai Virtual Display ($DISPLAY_NUM) & VNC Server (Port $RFB_PORT) ==="
 
 # Bersihkan sisa lock X11 jika ada crash sebelumnya
-rm -f /tmp/.X1-lock /tmp/.X11-unix/X1 2>/dev/null || true
+rm -f "/tmp/.X${DISP_ID}-lock" "/tmp/.X11-unix/X${DISP_ID}" 2>/dev/null || true
 
 # Jalankan Xvfb virtual framebuffer
 Xvfb $DISPLAY_NUM -screen 0 $GEOMETRY -ac +extension GLX +render -noreset &
@@ -28,7 +29,7 @@ echo "[INFO] Fluxbox berjalan (PID: $FLUXBOX_PID)"
 cleanup() {
     echo "[INFO] Menghentikan VNC dan virtual display..."
     kill -TERM "$XVFB_PID" "$FLUXBOX_PID" "$VNC_PID" 2>/dev/null || true
-    rm -f /tmp/.X1-lock /tmp/.X11-unix/X1 2>/dev/null || true
+    rm -f "/tmp/.X${DISP_ID}-lock" "/tmp/.X11-unix/X${DISP_ID}" 2>/dev/null || true
     exit 0
 }
 trap cleanup SIGTERM SIGINT
