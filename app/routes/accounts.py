@@ -131,31 +131,41 @@ def open_login(profile_id: str):
         email = profile.account_email
         password = profile.account_password
 
-        def launch_thread():
-            try:
-                success, msg = SessionManager.launch_manual_login(
-                    profile_label=label,
-                    poll_duration_min=20,
-                    email=email,
-                    password=password
-                )
-                db_t = SessionLocal()
-                try:
-                    p = db_t.get(AccountProfile, profile_id)
-                    if p:
-                        p.session_status = "READY" if success else "LOGIN_REQUIRED"
-                        db_t.commit()
-                finally:
-                    db_t.close()
-            except Exception as ex:
-                pass
+        # Dispatch ke worker container yang memiliki display VNC
+        dispatched = False
+        try:
+            from app.tasks.celery_app import open_login_browser
+            open_login_browser.delay(label, profile_id, email, password)
+            dispatched = True
+        except Exception as cel_err:
+            pass
 
-        t = threading.Thread(target=launch_thread, daemon=True)
-        t.start()
+        if not dispatched:
+            def launch_thread():
+                try:
+                    success, msg = SessionManager.launch_manual_login(
+                        profile_label=label,
+                        poll_duration_min=20,
+                        email=email,
+                        password=password
+                    )
+                    db_t = SessionLocal()
+                    try:
+                        p = db_t.get(AccountProfile, profile_id)
+                        if p:
+                            p.session_status = "READY" if success else "LOGIN_REQUIRED"
+                            db_t.commit()
+                    finally:
+                        db_t.close()
+                except Exception as ex:
+                    pass
+
+            t = threading.Thread(target=launch_thread, daemon=True)
+            t.start()
 
         flash(
-            f"Browser Chromium ({profile.account_label}) telah dibuka di layar komputer Anda! "
-            "Email & password akan otomatis terisi jika sudah disimpan. Silakan klik Login pada browser.",
+            f"Browser Chromium ({profile.account_label}) telah dibuka di layar VNC port 5902! "
+            "Silakan buka VNC Viewer (2.58.82.253:5902) untuk melihat browser.",
             "success"
         )
         return redirect(url_for("accounts.index"))

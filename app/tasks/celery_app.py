@@ -157,9 +157,35 @@ def scrape_country_job(job_id: str, limit: int = 2000, headless: Optional[bool] 
     """Executes single country scrape job."""
     from app.services.job_service import JobService
     if headless is None:
-        headless = True
+        headless = settings.KALODATA_HEADLESS
     JobService.execute_job_now(job_id, limit=limit, headless=headless)
     return {"job_id": job_id, "status": "FINISHED"}
+
+
+@celery_app.task(name="app.tasks.celery_app.open_login_browser")
+def open_login_browser(profile_label: str, profile_id: str, email: Optional[str] = None, password: Optional[str] = None):
+    """Launches manual login browser in worker container where VNC is running."""
+    from app.scrapers.kalodata.session import SessionManager
+    from app.models.entities import AccountProfile
+    try:
+        success, msg = SessionManager.launch_manual_login(
+            profile_label=profile_label,
+            poll_duration_min=20,
+            email=email,
+            password=password
+        )
+        db = SessionLocal()
+        try:
+            p = db.get(AccountProfile, profile_id)
+            if p:
+                p.session_status = "READY" if success else "LOGIN_REQUIRED"
+                db.commit()
+        finally:
+            db.close()
+        return {"status": "SUCCESS" if success else "FAILED", "message": msg}
+    except Exception as e:
+        logger.error("Failed manual login browser task", error=str(e))
+        return {"status": "ERROR", "message": str(e)}
 
 
 @celery_app.task(name="app.tasks.celery_app.run_cleanup")
