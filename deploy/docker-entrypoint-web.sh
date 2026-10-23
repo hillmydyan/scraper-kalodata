@@ -16,5 +16,9 @@ for i in range(30):
         time.sleep(1)
 "
 
+# Pastikan schema database terinisialisasi dan akun admin tersedia
+python -c "from app.models import init_db; init_db()" || true
+python -m app.cli create-admin --username admin --password admin || true
+
 echo "=== Menjalankan Web Dashboard Gunicorn di port 8081 ==="
 exec gunicorn --bind 0.0.0.0:8081 --workers 2 --timeout 120 "app:create_app()"
