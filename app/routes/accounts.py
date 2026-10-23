@@ -113,6 +113,25 @@ def force_ready(profile_id: str):
         db.close()
 
 
+@accounts_bp.route("/accounts/unlock/<profile_id>", methods=["POST"])
+@admin_required
+def unlock_profile(profile_id: str):
+    from app.scrapers.base import BaseScraper
+    db = SessionLocal()
+    try:
+        profile = db.get(AccountProfile, profile_id)
+        label = profile.profile_dir_name if profile else "indo"
+        BaseScraper.force_unlock(label)
+        BaseScraper.force_unlock("default")
+        if profile and profile.session_status in ("VALIDATING", "WAITING_FOR_VERIFICATION"):
+            profile.session_status = "READY"
+            db.commit()
+        flash(f"Lock profil '{label}' berhasil dibuka / di-reset!", "success")
+        return redirect(url_for("accounts.index"))
+    finally:
+        db.close()
+
+
 @accounts_bp.route("/accounts/open-login/<profile_id>", methods=["POST"])
 @admin_required
 def open_login(profile_id: str):

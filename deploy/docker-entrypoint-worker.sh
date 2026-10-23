@@ -11,8 +11,9 @@ echo " [KALODATA WORKER] Memulai Container Playwright + VNC Display"
 echo " Display: $DISPLAY_NUM | Port VNC Internal: $RFB_PORT | Resolusi: $GEOMETRY"
 echo "=================================================================="
 
-# Bersihkan sisa lock X11 di container jika ada restart
+# Bersihkan sisa lock X11 dan lock profil scraper jika ada restart
 rm -f "/tmp/.X${DISP_ID}-lock" "/tmp/.X11-unix/X${DISP_ID}" 2>/dev/null || true
+rm -f /app/runtime/locks/*.lock 2>/dev/null || true
 
 # 1. Jalankan Xvfb virtual framebuffer
 Xvfb $DISPLAY_NUM -screen 0 $GEOMETRY -ac +extension GLX +render -noreset &

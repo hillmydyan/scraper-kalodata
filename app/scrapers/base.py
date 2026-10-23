@@ -128,6 +128,22 @@ class BaseScraper:
                 pass
             self.redis_client = None
 
+    @classmethod
+    def force_unlock(cls, profile_label: str = "indo"):
+        """Cleans up stale lock file and Redis lock for a profile."""
+        lock_file = settings.RUNTIME_DIR / "locks" / f"profile_{profile_label}.lock"
+        try:
+            if lock_file.exists():
+                lock_file.unlink(missing_ok=True)
+        except Exception:
+            pass
+        try:
+            import redis
+            r = redis.Redis.from_url(settings.REDIS_URL, socket_timeout=2)
+            r.delete(f"lock:profile:{profile_label}")
+        except Exception:
+            pass
+
     def launch_browser(self, headless: Optional[bool] = None, slow_mo: int = 100, channel: Optional[str] = None):
         """
         Launches persistent browser context (§7.2, §7.6).
