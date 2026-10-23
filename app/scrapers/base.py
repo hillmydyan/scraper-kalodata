@@ -155,7 +155,13 @@ class BaseScraper:
             headless = settings.KALODATA_HEADLESS
 
         if channel is None:
-            channel = os.getenv("CHROME_CHANNEL", "chrome")
+            raw_channel = os.getenv("CHROME_CHANNEL", "").strip()
+            if raw_channel:
+                channel = raw_channel
+            elif sys.platform == "win32":
+                channel = "chrome"
+            else:
+                channel = None
 
         env = os.environ.copy()
         if headless:
@@ -206,47 +212,12 @@ class BaseScraper:
             self.browser_context = self.playwright.chromium.launch_persistent_context(**kwargs)
         except Exception as ex:
             err_msg = str(ex)
-            # Fallback 1: If launched with channel (e.g. system chrome) and failed, try standard chromium
+            # Fallback: If launched with channel (e.g. system chrome) and failed, try standard bundled chromium
             if kwargs.get("channel"):
                 logger.warning("Failed to launch with channel, falling back to default chromium", error=err_msg)
                 kwargs.pop("channel", None)
-                try:
-                    self.browser_context = self.playwright.chromium.launch_persistent_context(**kwargs)
-                except Exception as inner_ex:
-                    ex = inner_ex
-                    err_msg = str(inner_ex)
-
-            # Fallback 2: Launch in pure headless without any DISPLAY
-            if self.browser_context is None:
-                logger.warning(
-                    "Persistent context launch failed. Retrying with pure headless (no DISPLAY)...",
-                    error=err_msg
-                )
-                attempt_env = os.environ.copy()
-                attempt_env.pop("DISPLAY", None)
-                attempt_env.pop("WAYLAND_DISPLAY", None)
-                pure_headless_kwargs = {
-                    "user_data_dir": str(self.profile_dir),
-                    "headless": True,
-                    "slow_mo": slow_mo,
-                    "args": [
-                        "--no-sandbox",
-                        "--disable-setuid-sandbox",
-                        "--disable-dev-shm-usage",
-                        "--disable-blink-features=AutomationControlled",
-                        "--headless=new",
-                        "--disable-gpu",
-                    ],
-                    "viewport": {"width": 1440, "height": 900},
-                    "user_agent": user_agent,
-                    "env": attempt_env,
-                }
-                try:
-                    self.browser_context = self.playwright.chromium.launch_persistent_context(**pure_headless_kwargs)
-                except Exception as head_ex:
-                    logger.error("Headless fallback also failed", error=str(head_ex))
-                    raise head_ex
-            elif self.browser_context is None:
+                self.browser_context = self.playwright.chromium.launch_persistent_context(**kwargs)
+            else:
                 raise ex
 
         # Stealth init script to mask automation & navigator.webdriver
@@ -326,3 +297,105 @@ class BaseScraper:
         """Random delay between product detail navigations (§6.9)."""
         delay = random.uniform(settings.DELAY_DETAIL_MIN, settings.DELAY_DETAIL_MAX)
         time.sleep(delay)
+
+    @staticmethod
+    def is_challenge_active(page) -> bool:
+        """
+        Detects if Cloudflare Turnstile, CAPTCHA, or challenge page is present.
+        """
+        try:
+            raw_title = page.title()
+            if isinstance(raw_title, str):
+                page_title = raw_title.lower()
+                if any(term in page_title for term in ["just a moment", "attention required", "cloudflare"]):
+                    return True
+        except Exception:
+            pass
+
+        try:
+            loc = page.locator("iframe[src*='challenges.cloudflare.com'], iframe[title*='Cloudflare'], #challenge-stage, #cf-turnstile")
+            vis = loc.first.is_visible(timeout=300)
+            if vis is True:
+                return True
+        except Exception:
+            pass
+
+        try:
+            loc2 = page.locator("text=/Verify you are human|Verifikasi bahwa Anda manusia|Verify to continue|Checking your browser/i")
+            vis2 = loc2.first.is_visible(timeout=300)
+            if vis2 is True:
+                return True
+        except Exception:
+            pass
+
+        try:
+            frames = getattr(page, "frames", None)
+            if isinstance(frames, (list, tuple)):
+                for frame in frames:
+                    f_url = getattr(frame, "url", None)
+                    if isinstance(f_url, str) and ("challenges.cloudflare.com" in f_url.lower() or "turnstile" in f_url.lower()):
+                        return True
+        except Exception:
+            pass
+
+        return False
+
+    @classmethod
+    def wait_for_challenge(
+        cls,
+        page,
+        job_id: Optional[str] = None,
+        max_wait_sec: int = 180,
+        cancel_check_cb=None
+    ) -> Tuple[bool, str]:
+        """
+        Human-in-the-loop solver for Cloudflare Turnstile / CAPTCHA (§7.4).
+        If challenge is detected, sets job status to BLOCKED and pauses execution.
+        The operator can view the browser in VNC Viewer (port 5902) and click the checkbox manually.
+        Once resolved, restores job status to RUNNING.
+        """
+        if not cls.is_challenge_active(page):
+            return True, "NONE"
+
+        logger.warning(
+            "Cloudflare challenge detected! Pausing job for manual VNC interaction",
+            job_id=job_id,
+            vnc_port=5902,
+            timeout_sec=max_wait_sec
+        )
+
+        from app.services.job_service import JobService
+        if job_id:
+            JobService.set_job_status(
+                job_id=job_id,
+                status="BLOCKED",
+                error_summary="Cloudflare Turnstile terdeteksi. Silakan buka VNC Viewer (Port 5902) dan klik kotak verifikasi."
+            )
+
+        start_time = time.time()
+        while time.time() - start_time < max_wait_sec:
+            if cancel_check_cb and cancel_check_cb():
+                logger.info("Scrape job cancelled by operator while waiting for VNC challenge click", job_id=job_id)
+                return False, "CANCELLED"
+
+            time.sleep(3)
+
+            if not cls.is_challenge_active(page):
+                logger.info("Cloudflare challenge cleared! Resuming scrape job...", job_id=job_id)
+                if job_id:
+                    JobService.set_job_status(
+                        job_id=job_id,
+                        status="RUNNING",
+                        error_summary=None
+                    )
+                time.sleep(2)
+                return True, "RESOLVED"
+
+        logger.error("Timed out waiting for manual Cloudflare resolution in VNC", job_id=job_id)
+        if job_id:
+            JobService.set_job_status(
+                job_id=job_id,
+                status="FAILED",
+                error_summary="Batas waktu habis (3 menit) menunggu verifikasi Turnstile di VNC Viewer."
+            )
+        return False, "TIMEOUT"

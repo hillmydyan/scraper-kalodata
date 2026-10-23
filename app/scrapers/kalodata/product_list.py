@@ -16,9 +16,10 @@ logger = structlog.get_logger(__name__)
 
 
 class ProductListScraper:
-    def __init__(self, page: Page, country_code: str):
+    def __init__(self, page: Page, country_code: str, job_id: Optional[str] = None):
         self.page = page
         self.country_code = country_code
+        self.job_id = job_id
         self.country_cfg = get_country_config(country_code)
         self.currency_code = self.country_cfg.get("currency_code", "IDR")
 
@@ -76,6 +77,15 @@ class ProductListScraper:
 
         while len(items) < max_limit:
             self.dismiss_overlays()
+
+            # Check for Cloudflare challenge and wait for operator if needed
+            if BaseScraper.is_challenge_active(self.page):
+                cleared, reason = BaseScraper.wait_for_challenge(
+                    self.page, job_id=self.job_id, cancel_check_cb=cancel_check_cb
+                )
+                if not cleared:
+                    break
+
             # Check cancellation flag (§8.6)
             if cancel_check_cb and cancel_check_cb():
                 logger.info("Scrape job cancellation requested by operator")

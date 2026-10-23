@@ -1,8 +1,10 @@
-FROM python:3.11-slim
+# Base image resmi Playwright dari Microsoft (Ubuntu Jammy)
+# Mencakup seluruh pustaka native Linux, GTK, X11, dan font Asia Tenggara
+FROM mcr.microsoft.com/playwright/python:v1.40.0-jammy
 
 WORKDIR /app
 
-# Install system dependencies including Xvfb, fluxbox, x11vnc for container VNC
+# Install dependensi tambahan untuk Database & VNC Server
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     libpq-dev \
@@ -11,14 +13,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     x11vnc \
     fluxbox \
     procps \
+    x11-xserver-utils \
     && rm -rf /var/lib/apt/lists/*
 
 # Install python dependencies
 COPY pyproject.toml .
 RUN pip install --no-cache-dir .
 
-# Install Playwright Chromium and its system dependencies
-RUN playwright install --with-deps chromium
+# Verifikasi browser Playwright Chromium
+RUN playwright install chromium
 
 # Copy application files and deploy scripts
 COPY app/ ./app/

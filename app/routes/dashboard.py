@@ -57,7 +57,7 @@ def index():
         # 3. Attention jobs (LOGIN_REQUIRED, FAILED, PARTIAL, DATA_NOT_READY)
         attention_jobs = db.execute(
             select(ScrapeJob)
-            .filter(ScrapeJob.status.in_(["LOGIN_REQUIRED", "FAILED", "PARTIAL", "DATA_NOT_READY"]))
+            .filter(ScrapeJob.status.in_(["BLOCKED", "LOGIN_REQUIRED", "FAILED", "PARTIAL", "DATA_NOT_READY"]))
             .order_by(desc(ScrapeJob.created_at))
             .limit(10)
         ).scalars().all()

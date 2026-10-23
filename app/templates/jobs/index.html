@@ -178,8 +178,28 @@
 
 
 
+{% if jobs and jobs|selectattr("status", "equalto", "BLOCKED")|list|length > 0 %}
+<!-- Alert Banner when any job is BLOCKED by Cloudflare -->
+<div style="margin-bottom: 1.5rem; background: #FFFBEB; border: 2px solid #F59E0B; border-radius: var(--radius-md); padding: 1.25rem 1.5rem; display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap;">
+  <div style="display: flex; align-items: center; gap: 0.85rem;">
+    <div style="background: #FDE68A; padding: 0.5rem; border-radius: 50%; color: #B45309; display: flex;">
+      {{ icon('lightning', 22, color='#B45309') }}
+    </div>
+    <div>
+      <div style="font-weight: 800; color: #92400E; font-size: 0.98rem; margin-bottom: 0.15rem;">
+        Perhatian: Ada Job Tertahan Verifikasi Cloudflare Turnstile
+      </div>
+      <div style="color: #78350F; font-size: 0.85rem;">
+        Silakan sambungkan <strong>VNC Viewer (Port 5902)</strong> lalu klik checkbox <em>"Verify you are human"</em>. Scraper otomatis lanjut setelah diklik.
+      </div>
+    </div>
+  </div>
+  <span class="status-pill status-BLOCKED">MENUNGGU KLIK VNC</span>
+</div>
+{% endif %}
+
 <!-- Card 3: Riwayat Job Scraping Terkini -->
-<div class="card-kurma">
+<div class="card-kurma" id="table-jobs">
   <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem;">
     <h2 class="card-title" style="margin: 0; display: flex; align-items: center; gap: 0.5rem;">
       {{ icon('server', 20, color='var(--color-primary)') }}
@@ -239,13 +259,13 @@
                   {{ icon('eye', 14) }}
                   <span>Detail</span>
                 </a>
-                {% if j.status in ['RUNNING', 'PENDING'] and current_user.role == 'admin' %}
+                {% if j.status in ['RUNNING', 'PENDING', 'BLOCKED'] and current_user.role == 'admin' %}
                 <form method="POST" action="{{ url_for('jobs.cancel', job_id=j.id) }}" style="display:inline;">
                   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                   <button type="submit" class="btn-kurma-danger" style="padding: 0.35rem 0.75rem; font-size: 0.8rem;" title="Batalkan Job">Batal</button>
                 </form>
                 {% endif %}
-                {% if j.status in ['PENDING', 'FAILED'] and current_user.role == 'admin' %}
+                {% if j.status in ['PENDING', 'FAILED', 'BLOCKED', 'CANCELLED'] and current_user.role == 'admin' %}
                 <form method="POST" action="{{ url_for('jobs.retry_job', job_id=j.id) }}" style="display:inline;">
                   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                   <button type="submit" class="btn-kurma" style="padding: 0.35rem 0.75rem; font-size: 0.8rem;" title="Jalankan Job Ini">Jalankan</button>
@@ -267,10 +287,10 @@
   </div>
 </div>
 
-{% if jobs and jobs|selectattr("status", "in", ["RUNNING", "PENDING"])|list|length > 0 %}
+{% if jobs and jobs|selectattr("status", "in", ["RUNNING", "PENDING", "BLOCKED"])|list|length > 0 %}
 <div style="margin-top: 1.5rem; display: flex; align-items: center; gap: 0.75rem; background: var(--color-primary-soft); border: 1px solid var(--color-border); padding: 0.85rem 1.25rem; border-radius: var(--radius-md); color: var(--color-primary); font-size: 0.88rem; font-weight: 700;">
   <span style="display: inline-block; width: 10px; height: 10px; background: var(--color-primary); border-radius: 50%; animation: pulse-green 1.5s infinite;"></span>
-  <span>Job scraping sedang berjalan di latar belakang... Halaman diperbarui otomatis setiap 5 detik.</span>
+  <span>Pipeline scraping aktif... Halaman diperbarui otomatis setiap 5 detik.</span>
 </div>
 <script>
   setTimeout(function() {

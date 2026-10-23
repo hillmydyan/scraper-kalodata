@@ -223,7 +223,7 @@ def cancel(job_id: str):
     db = SessionLocal()
     try:
         job = db.get(ScrapeJob, job_id)
-        if job and job.status in ("RUNNING", "PENDING"):
+        if job and job.status in ("RUNNING", "PENDING", "BLOCKED"):
             job.status = "CANCELLED"
             job.finished_at = datetime.now(timezone.utc)
             db.commit()

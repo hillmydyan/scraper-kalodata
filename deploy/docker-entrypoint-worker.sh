@@ -22,6 +22,7 @@ echo "[INFO] Xvfb virtual display aktif (PID: $XVFB_PID)"
 sleep 1
 
 # 2. Jalankan fluxbox window manager
+DISPLAY=$DISPLAY_NUM xsetroot -solid "#1e1e2d" 2>/dev/null || true
 DISPLAY=$DISPLAY_NUM fluxbox &
 FLUXBOX_PID=$!
 echo "[INFO] Fluxbox window manager aktif (PID: $FLUXBOX_PID)"
@@ -43,9 +44,9 @@ trap cleanup SIGTERM SIGINT
 
 export DISPLAY=$DISPLAY_NUM
 
-# 4. Jalankan Celery worker
-echo "=== Menjalankan Kalodata Celery Scraper Worker ==="
-celery -A app.tasks.celery_app worker -c 1 -Q kalodata,celery --loglevel=INFO &
+# 4. Jalankan Celery worker dengan --pool=solo
+echo "=== Menjalankan Kalodata Celery Scraper Worker (--pool=solo) ==="
+celery -A app.tasks.celery_app worker --pool=solo -Q kalodata,celery --loglevel=INFO &
 CELERY_PID=$!
 
 wait $CELERY_PID

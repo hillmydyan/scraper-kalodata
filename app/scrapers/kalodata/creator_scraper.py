@@ -32,9 +32,10 @@ logger = structlog.get_logger(__name__)
 
 
 class CreatorScraper:
-    def __init__(self, page: Page, country_code: str = "ID"):
+    def __init__(self, page: Page, country_code: str = "ID", job_id: Optional[str] = None):
         self.page = page
         self.country_code = country_code.upper()
+        self.job_id = job_id
         self.currency_code = "IDR" if self.country_code == "ID" else ("MYR" if self.country_code == "MY" else "THB")
 
     def dismiss_overlays(self, target_page: Optional[Page] = None) -> None:
@@ -182,6 +183,16 @@ class CreatorScraper:
                     break
 
                 self.dismiss_overlays()
+
+                # Check for Cloudflare challenge and wait for operator in VNC
+                if BaseScraper.is_challenge_active(self.page):
+                    cleared, reason = BaseScraper.wait_for_challenge(
+                        self.page, job_id=self.job_id, cancel_check_cb=cancel_check_cb
+                    )
+                    if not cleared:
+                        stop_scraping = True
+                        break
+
                 rows = self.page.locator("tbody tr.group, tbody tr").all()
                 if not rows:
                     logger.info("No creator rows found")

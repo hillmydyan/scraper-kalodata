@@ -16,12 +16,33 @@ logger = structlog.get_logger(__name__)
 
 class SessionManager:
     @staticmethod
-    def validate_session(page: Page, timeout_sec: int = 30) -> Tuple[str, str]:
+    def is_challenge_active(page: Page) -> bool:
+        return BaseScraper.is_challenge_active(page)
+
+    @staticmethod
+    def check_and_wait_for_challenge(
+        page: Page,
+        job_id: Optional[str] = None,
+        max_wait_sec: int = 180,
+        cancel_check_cb=None
+    ) -> Tuple[bool, str]:
+        return BaseScraper.wait_for_challenge(page, job_id=job_id, max_wait_sec=max_wait_sec, cancel_check_cb=cancel_check_cb)
+
+    @staticmethod
+    def validate_session(
+        page: Page,
+        timeout_sec: int = 30,
+        job_id: Optional[str] = None,
+        wait_for_human: bool = False,
+        max_human_wait_sec: int = 180,
+        cancel_check_cb=None
+    ) -> Tuple[str, str]:
         """
         Validates if current persistent profile session is logged in (§7.4).
+        If wait_for_human is True and Cloudflare is detected, pauses and waits for manual VNC click.
         Returns:
             (status, message)
-            status is one of: 'READY', 'LOGIN_REQUIRED', 'ERROR', 'ACCESS_RESTRICTED'
+            status is one of: 'READY', 'LOGIN_REQUIRED', 'ERROR', 'ACCESS_RESTRICTED', 'CANCELLED'
         """
         target_url = f"{settings.KALODATA_BASE_URL.rstrip('/')}/product"
         logger.info("Validating session on page", url=target_url)
@@ -34,35 +55,21 @@ class SessionManager:
         except Exception as e:
             return "ERROR", f"Network error during session validation: {str(e)}"
 
-        # Check for genuine Cloudflare challenge block pages and allow time to auto-clear or click
-        for _ in range(8):
-            page_title = (page.title() or "").lower()
-            if "just a moment" in page_title or "attention required" in page_title or "cloudflare" in page_title:
-                logger.info("Cloudflare challenge page in progress, waiting for verification...", title=page_title)
-                try:
-                    # Attempt click on turnstile checkbox inside any frame
-                    for frame in page.frames:
-                        if "cloudflare" in frame.url or "challenges" in frame.url:
-                            checkbox = frame.locator("input[type='checkbox'], .ctp-checkbox-label, #challenge-stage").first
-                            if checkbox.is_visible(timeout=1000):
-                                logger.info("Clicking Cloudflare challenge checkbox in frame...")
-                                checkbox.click(force=True)
-                                break
-                except Exception:
-                    pass
-                page.wait_for_timeout(2000)
+        # Check for genuine Cloudflare challenge
+        if BaseScraper.is_challenge_active(page):
+            if wait_for_human:
+                cleared, reason = BaseScraper.wait_for_challenge(
+                    page=page,
+                    job_id=job_id,
+                    max_wait_sec=max_human_wait_sec,
+                    cancel_check_cb=cancel_check_cb
+                )
+                if not cleared:
+                    if reason == "CANCELLED":
+                        return "CANCELLED", "Job dibatalkan oleh pengguna saat menunggu verifikasi Cloudflare."
+                    return "ACCESS_RESTRICTED", "Timeout menunggu penyelesaian Cloudflare di VNC Viewer (Port 5902)."
             else:
-                break
-
-        page_title = (page.title() or "").lower()
-        if "just a moment" in page_title or "attention required" in page_title:
-            return "ACCESS_RESTRICTED", "Cloudflare verification challenge page detected. Browser tertahan di halaman Cloudflare (Just a moment...)."
-
-        try:
-            if page.locator("text='Verify you are human'").first.is_visible(timeout=500):
-                return "ACCESS_RESTRICTED", "Cloudflare Turnstile challenge detected."
-        except Exception:
-            pass
+                return "ACCESS_RESTRICTED", "Cloudflare verification challenge page detected (Just a moment...)."
 
         # Check if redirected to login page
         current_url = page.url.lower()
@@ -138,8 +145,8 @@ class SessionManager:
                 time.sleep(3)
                 try:
                     curr_url = page.url.lower()
-                    # Check if user successfully submitted login and navigated away from login page
-                    if "login" not in curr_url and "signin" not in curr_url and "about:blank" not in curr_url:
+                    # Check if user successfully submitted login and navigated away from login page without sitting on challenge
+                    if "login" not in curr_url and "signin" not in curr_url and "about:blank" not in curr_url and not BaseScraper.is_challenge_active(page):
                         logger.info("Manual login detected via URL redirect", url=page.url)
                         time.sleep(3)  # Allow cookies to flush
                         return True, "Login successful and session validated."

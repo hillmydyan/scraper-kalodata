@@ -1,5 +1,3 @@
-version: "3.8"
-
 services:
   kalodata-db:
     image: postgres:15-alpine

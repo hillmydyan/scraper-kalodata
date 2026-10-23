@@ -279,6 +279,31 @@ class JobService:
             db.commit()
 
     @classmethod
+    def set_job_status(
+        cls,
+        job_id: str,
+        status: str,
+        error_summary: Optional[str] = None,
+        stage: Optional[str] = None
+    ):
+        """Updates a job's status, error summary, or stage dynamically."""
+        from app.models import SessionLocal
+        db = SessionLocal()
+        try:
+            job = db.get(ScrapeJob, job_id)
+            if job and job.status != "CANCELLED":
+                job.status = status
+                if error_summary is not None:
+                    job.error_summary = error_summary
+                elif status == "RUNNING":
+                    job.error_summary = None
+                if stage is not None:
+                    job.stage = stage
+                db.commit()
+        finally:
+            db.close()
+
+    @classmethod
     def execute_job_now(
         cls,
         job_id: str,
@@ -299,6 +324,14 @@ class JobService:
             job = db.get(ScrapeJob, job_id)
             if not job or job.status == "CANCELLED":
                 return
+
+            def cancel_check():
+                db_chk = SessionLocal()
+                try:
+                    j = db_chk.get(ScrapeJob, job.id)
+                    return j.status == "CANCELLED" if j else True
+                finally:
+                    db_chk.close()
 
             job.status = "RUNNING"
             job.stage = "STARTING"
@@ -322,10 +355,17 @@ class JobService:
                 context = scraper.launch_browser(headless=headless)
                 page = context.new_page()
 
-                # Step 1: Validate Session
+                # Step 1: Validate Session (with human-in-the-loop solver if Turnstile appears)
                 job.stage = "VALIDATING_SESSION"
                 db.commit()
-                status, msg = SessionManager.validate_session(page, timeout_sec=20)
+                status, msg = SessionManager.validate_session(
+                    page,
+                    timeout_sec=25,
+                    job_id=job.id,
+                    wait_for_human=True,
+                    max_human_wait_sec=180,
+                    cancel_check_cb=cancel_check
+                )
                 if status != "READY":
                     cls.finalize_job(db, job.id, status=status, error_code=status, error_summary=msg)
                     return
@@ -340,22 +380,16 @@ class JobService:
                     page.goto(f"{settings.KALODATA_BASE_URL.rstrip('/')}/creator", wait_until="domcontentloaded", timeout=30000)
                     page.wait_for_timeout(2000)
 
+                    SessionManager.check_and_wait_for_challenge(page, job_id=job.id, cancel_check_cb=cancel_check)
+
                     nav.ensure_ui_language(settings.KALODATA_UI_LANGUAGE)
                     nav.switch_and_verify_region(job.country_code)
 
                     job.stage = "SCRAPING_CREATORS"
                     db.commit()
 
-                    creator_scraper = CreatorScraper(page, job.country_code)
+                    creator_scraper = CreatorScraper(page, job.country_code, job_id=job.id)
                     creator_scraper.apply_filters()
-
-                    def cancel_check():
-                        db_chk = SessionLocal()
-                        try:
-                            j = db_chk.get(ScrapeJob, job.id)
-                            return j.status == "CANCELLED" if j else True
-                        finally:
-                            db_chk.close()
 
                     def checkpoint_cb(current_items, scanned_count):
                         cls.save_checkpoint(
@@ -393,6 +427,7 @@ class JobService:
                     # Step 2: Language & Region
                     job.stage = "NAVIGATING_REGION"
                     db.commit()
+                    SessionManager.check_and_wait_for_challenge(page, job_id=job.id, cancel_check_cb=cancel_check)
                     nav.ensure_ui_language(settings.KALODATA_UI_LANGUAGE)
                     nav.switch_and_verify_region(job.country_code)
 
@@ -415,15 +450,7 @@ class JobService:
                     job.stage = "SCRAPING_PRODUCTS"
                     db.commit()
 
-                    list_scraper = ProductListScraper(page, job.country_code)
-
-                    def cancel_check():
-                        db_chk = SessionLocal()
-                        try:
-                            j = db_chk.get(ScrapeJob, job.id)
-                            return j.status == "CANCELLED" if j else True
-                        finally:
-                            db_chk.close()
+                    list_scraper = ProductListScraper(page, job.country_code, job_id=job.id)
 
                     def checkpoint_cb(current_items, scanned_count):
                         cls.save_checkpoint(
