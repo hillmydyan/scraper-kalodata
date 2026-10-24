@@ -88,4 +88,8 @@ def create_app() -> Flask:
     app.register_blueprint(api_bp)
     app.register_blueprint(analytics_bp)
 
+    # Start auto-scheduler background thread for standalone server
+    from app.services.scheduler_service import SchedulerService
+    SchedulerService.start_scheduler_thread()
+
     return app

@@ -44,6 +44,7 @@ def index():
                 "time": "01:10 AM",
                 "target_limit": 200,
                 "target_region": "ALL",
+                "module": "creator",
                 "auto_schedule": True,
                 "current_time_wib": now_wib
             }
@@ -78,6 +79,7 @@ def save_schedule():
     schedule_time = request.form.get("schedule_time", "01:10 AM")
     target_limit_str = request.form.get("target_limit", "200")
     target_region = request.form.get("target_region", "ALL")
+    module = request.form.get("module", "creator")
     auto_schedule = request.form.get("auto_schedule") in ("on", "true", "1")
 
     try:
@@ -89,6 +91,7 @@ def save_schedule():
         "time": schedule_time,
         "target_limit": target_limit,
         "target_region": target_region,
+        "module": module,
         "auto_schedule": auto_schedule,
     }
 

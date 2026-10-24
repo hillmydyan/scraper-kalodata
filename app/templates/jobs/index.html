@@ -46,7 +46,7 @@
       <div class="form-group">
         <label class="form-label" for="schedule_time">Jam Eksekusi Harian (WIB)</label>
         <div class="input-with-icon">
-          <input type="text" id="schedule_time" name="schedule_time" value="{{ schedule_config.time }}" class="form-input" placeholder="01:10 AM" required>
+          <input type="text" id="schedule_time" name="schedule_time" value="{{ schedule_config.time }}" class="form-input" placeholder="12:00 PM" required>
           <span class="input-icon-right">
             {{ icon('clock', 18, color='var(--color-text-muted)') }}
           </span>
@@ -55,29 +55,35 @@
       </div>
 
       <div class="form-group">
-        <label class="form-label">Kriteria Scraping Otomatis</label>
-        <div style="background: #F8FAFC; border: 1px solid var(--color-border-subtle); border-radius: 6px; padding: 0.5rem 0.75rem; font-size: 0.82rem; color: var(--color-text);">
-          <div style="display: flex; align-items: center; gap: 0.35rem; color: var(--color-success); font-weight: 700; margin-bottom: 0.2rem;">
-            {{ icon('check', 14, stroke=2.5) }} Kreator: Pendapatan &ge; Rp4.000.000
-          </div>
-          <div style="display: flex; align-items: center; gap: 0.35rem; color: var(--color-success); font-weight: 700; margin-bottom: 0.15rem;">
-            {{ icon('check', 14, stroke=2.5) }} Produk: Penjualan &gt; 50 Terjual
-          </div>
-          <span style="color: var(--color-text-muted); font-size: 0.78rem;">Sistem otomatis menyaring data sesuai kriteria minimum.</span>
-        </div>
-        <input type="hidden" id="target_limit" name="target_limit" value="{{ schedule_config.target_limit or 2000 }}">
+        <label class="form-label" for="schedule_module">Modul Scraping Kalodata</label>
+        <select id="schedule_module" name="module" class="form-select">
+          <option value="creator" {% if schedule_config.module == 'creator' %}selected{% endif %}>Menu Kreator (Kreator + 3 Produk Terlaris)</option>
+          <option value="product" {% if schedule_config.module == 'product' %}selected{% endif %}>Menu Produk (Katalog Produk Kalodata)</option>
+        </select>
+        <div class="field-hint">Modul data Kalodata yang ditarik saat jadwal otomatis berjalan.</div>
       </div>
 
       <div class="form-group">
         <label class="form-label" for="target_region">Target Region (Kalodata)</label>
         <select id="target_region" name="target_region" class="form-select">
-          <option value="MY" {% if schedule_config.target_region == 'MY' %}selected{% endif %}>MY Malaysia (Kalodata MY)</option>
-          <option value="ID" {% if schedule_config.target_region == 'ID' %}selected{% endif %}>ID Indonesia (Kalodata ID)</option>
-          <option value="TH" {% if schedule_config.target_region == 'TH' %}selected{% endif %}>TH Thailand (Kalodata TH)</option>
           <option value="ALL" {% if schedule_config.target_region == 'ALL' %}selected{% endif %}>Semua Region (ID &rarr; MY &rarr; TH)</option>
+          <option value="ID" {% if schedule_config.target_region == 'ID' %}selected{% endif %}>ID Indonesia (Kalodata ID)</option>
+          <option value="MY" {% if schedule_config.target_region == 'MY' %}selected{% endif %}>MY Malaysia (Kalodata MY)</option>
+          <option value="TH" {% if schedule_config.target_region == 'TH' %}selected{% endif %}>TH Thailand (Kalodata TH)</option>
         </select>
         <div class="field-hint">Negara tujuan scraping harian di https://www.kalodata.com.</div>
       </div>
+    </div>
+
+    <!-- Kriteria Scraping Banner -->
+    <div style="margin-top: 0.75rem; background: #F8FAFC; border: 1px solid var(--color-border-subtle); border-radius: 6px; padding: 0.6rem 0.85rem; font-size: 0.82rem; color: var(--color-text); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem;">
+      <div style="display: flex; align-items: center; gap: 1rem;">
+        <span style="font-weight: 700; color: var(--color-text-heading);">Kriteria Minimum:</span>
+        <span style="color: var(--color-success); font-weight: 700;">{{ icon('check', 14, stroke=2.5) }} Kreator: Pendapatan &ge; Rp4.000.000</span>
+        <span style="color: var(--color-success); font-weight: 700;">{{ icon('check', 14, stroke=2.5) }} Produk: Penjualan &gt; 50 Terjual</span>
+      </div>
+      <span style="color: var(--color-text-muted); font-size: 0.78rem;">Sistem otomatis menyaring data tanpa batas kuota.</span>
+      <input type="hidden" id="target_limit" name="target_limit" value="{{ schedule_config.target_limit or 2000 }}">
     </div>
 
     <div class="switch-row">
