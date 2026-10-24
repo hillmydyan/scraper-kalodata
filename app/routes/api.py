@@ -43,11 +43,12 @@ def health():
         status["redis"] = f"unhealthy: {str(e)}"
         status["status"] = "degraded"
 
-    # Disk test
-    total, used, free = shutil.disk_usage(settings.RUNTIME_DIR)
-    free_mb = free / (1024 * 1024)
-    if free_mb < settings.MIN_FREE_DISK_MB:
-        status["disk_ok"] = False
-        status["status"] = "degraded"
+    # Scheduler check
+    from app.services.scheduler_service import SchedulerService
+    if not (SchedulerService._thread and SchedulerService._thread.is_alive()):
+        # Ensure scheduler thread is started
+        SchedulerService.start_scheduler_thread()
+
+    status["scheduler_alive"] = bool(SchedulerService._thread and SchedulerService._thread.is_alive())
 
     return jsonify(status)

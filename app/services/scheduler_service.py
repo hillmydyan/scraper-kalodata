@@ -88,34 +88,70 @@ class SchedulerService:
             yesterday = (now_wib - timedelta(days=1)).date()
             region = cfg.get("target_region", "ALL")
             target_countries = None if region == "ALL" else [region]
-            modules_to_run = ["creator", "product"] if module == "both" else [module]
-            triggered_runs = []
+            module = cfg.get("module", "creator")
+            headless = getattr(settings, "KALODATA_HEADLESS", False)
 
             from app.services.job_service import JobService
-            for mod in modules_to_run:
+            if module == "both":
+                def run_both_sequentially():
+                    logger.info("Auto-scheduler starting sequential runs (creator then product)")
+                    for mod in ["creator", "product"]:
+                        run_id = None
+                        db_init = SessionLocal()
+                        try:
+                            run = JobService.create_daily_run(
+                                db_init,
+                                period_date=yesterday,
+                                trigger="scheduled",
+                                created_by="auto_scheduler",
+                                countries=target_countries,
+                                module=mod
+                            )
+                            db_init.commit()
+                            run_id = run.id
+                        finally:
+                            db_init.close()
+
+                        # Execute jobs synchronously in this background thread
+                        db_exec = SessionLocal()
+                        try:
+                            jobs = db_exec.query(ScrapeJob).filter_by(run_id=run_id).order_by(ScrapeJob.created_at).all()
+                            for j in jobs:
+                                JobService.execute_job_now(j.id, limit=None, headless=headless)
+                            r_obj = db_exec.get(ScrapeRun, run_id)
+                            if r_obj:
+                                r_obj.status = "COMPLETED"
+                                r_obj.finished_at = datetime.now(timezone.utc)
+                                db_exec.commit()
+                        except Exception as ex:
+                            logger.error("Error executing scheduled run for module", module=mod, error=str(ex))
+                        finally:
+                            db_exec.close()
+
+                threading.Thread(target=run_both_sequentially, daemon=True, name="SequentialScheduledRuns").start()
+                return "Started sequential scheduled runs for creator and product"
+            else:
                 run = JobService.create_daily_run(
                     db,
                     period_date=yesterday,
                     trigger="scheduled",
                     created_by="auto_scheduler",
                     countries=target_countries,
-                    module=mod
+                    module=module
                 )
                 db.commit()
 
                 logger.info(
                     "Auto schedule triggered successfully!",
                     run_id=run.id,
-                    module=mod,
+                    module=module,
                     region=region,
                     time=target_time_str
                 )
 
                 # Limit is None for scheduled runs to scrape all valid rows matching thresholds
                 JobService.dispatch_run_in_background(run.id, limit=None, headless=headless)
-                triggered_runs.append(run.id)
-
-            return f"Triggered scheduled run(s): {', '.join(triggered_runs)}"
+                return f"Triggered scheduled run: {run.id}"
         except Exception as e:
             logger.error("Error evaluating auto-schedule", error=str(e), exc_info=True)
             return f"Error: {e}"

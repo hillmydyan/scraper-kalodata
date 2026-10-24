@@ -127,6 +127,13 @@ def save_schedule():
             flag_modified(setting, "value")
 
         db.commit()
+
+        # Ensure scheduler thread is running and reset trigger cache
+        from app.services.scheduler_service import SchedulerService
+        SchedulerService.start_scheduler_thread()
+        with SchedulerService._lock:
+            SchedulerService._last_triggered_minute = None
+
         flash("Konfigurasi jadwal otomatis harian berhasil disimpan!", "success")
     finally:
         db.close()
