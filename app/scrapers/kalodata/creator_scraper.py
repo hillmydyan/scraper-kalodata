@@ -364,45 +364,80 @@ class CreatorScraper:
                             comm_rate = None
 
                             if p_url:
-                                try:
-                                    prod_tab.goto(p_url, wait_until="domcontentloaded", timeout=20000)
-                                    prod_tab.wait_for_timeout(2000)
-                                    self.dismiss_overlays(prod_tab)
+                                for attempt in range(2):
+                                    try:
+                                        prod_tab.goto(p_url, wait_until="domcontentloaded", timeout=20000)
+                                        prod_tab.wait_for_timeout(2000)
+                                        self.dismiss_overlays(prod_tab)
 
-                                    p_info = prod_tab.evaluate("""() => {
-                                        let shop = '';
-                                        const infoCard = document.querySelector('.infocard, .section4');
-                                        if (infoCard) {
-                                            const shopEl = infoCard.querySelector('.bg-base-faf .text-ellipsis1, .bg-base-faf .font-bold, .text-ellipsis1');
-                                            if (shopEl) shop = shopEl.innerText.trim();
-                                        }
-                                        if (!shop) {
-                                            const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
-                                            let node;
-                                            while (node = walker.nextNode()) {
-                                                if (node.nodeValue.trim() === 'Informasi Toko') {
-                                                    const card = node.parentElement.closest('.section4, .infocard') || node.parentElement.parentElement.parentElement;
-                                                    if (card) {
-                                                        const el = card.querySelector('.bg-base-faf .text-ellipsis1, .text-ellipsis1');
-                                                        if (el) shop = el.innerText.trim();
-                                                    }
+                                        p_info = prod_tab.evaluate("""() => {
+                                            let shop = '';
+                                            // 1. Direct shop link (most reliable on modern Kalodata)
+                                            const shopLinks = Array.from(document.querySelectorAll('a[href*="/shop/detail"], a[href*="/seller/detail"]'));
+                                            for (const a of shopLinks) {
+                                                const txt = a.innerText.trim();
+                                                if (txt && !/^(?:detail|lihat|view)$/i.test(txt)) {
+                                                    shop = txt;
                                                     break;
                                                 }
                                             }
-                                        }
-                                        let comm = '';
-                                        const m = document.body.innerText.match(/Tingkat komisi[^\\d]*(\\d+(?:[\\.,]\\d+)?\\s*%)/i);
-                                        if (m) comm = m[1];
-                                        return { shop: shop, comm: comm };
-                                    }""")
-                                    shop_name = p_info.get("shop", "")
-                                    if shop_name:
-                                        first_line = shop_name.split("\n")[0].strip()
-                                        shop_name = re.sub(r"\s*(?:Toko Lokal|Toko Cross Border|Lintas Batas|Local Shop|Cross Border)\s*$", "", first_line, flags=re.I).strip()
-                                    comm_raw = p_info.get("comm", "")
-                                    comm_rate = NumberParser.parse_commission_rate(comm_raw)
-                                except Exception as p_ex:
-                                    logger.warning("Error loading product detail for creator product", error=str(p_ex))
+                                            // 2. Info card / section container
+                                            if (!shop && shopLinks.length > 0) {
+                                                const parent = shopLinks[0].closest('div[class*="bg-"], div[class*="rounded"], .section4, .infocard');
+                                                if (parent) {
+                                                    const titleEl = parent.querySelector('.font-bold, [class*="font-semibold"], [class*="text-ellipsis"]');
+                                                    if (titleEl && !/^(?:detail|lihat|view)$/i.test(titleEl.innerText.trim())) {
+                                                        shop = titleEl.innerText.trim();
+                                                    }
+                                                }
+                                            }
+                                            // 3. Info card by class fallback
+                                            if (!shop) {
+                                                const infoCard = document.querySelector('.infocard, .section4, [class*="bg-[#FAFAFA]"], .bg-base-faf');
+                                                if (infoCard) {
+                                                    const shopEl = infoCard.querySelector('.text-ellipsis1, .font-bold, div[class*="font-"]');
+                                                    if (shopEl && !/^(?:detail|lihat|view)$/i.test(shopEl.innerText.trim())) {
+                                                        shop = shopEl.innerText.trim();
+                                                    }
+                                                }
+                                            }
+                                            // 4. TreeWalker for Shop Information / Informasi Toko
+                                            if (!shop) {
+                                                const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+                                                let node;
+                                                while (node = walker.nextNode()) {
+                                                    const val = node.nodeValue.trim();
+                                                    if (/^(?:Informasi Toko|Shop Information|Store Information|Brand & Shop)$/i.test(val)) {
+                                                        const card = node.parentElement.closest('div[class*="rounded"], .section4, .infocard') || node.parentElement.parentElement;
+                                                        if (card) {
+                                                            const el = card.querySelector('a[href*="/shop/detail"], .text-ellipsis1, .font-bold');
+                                                            if (el && !/^(?:detail|lihat|view)$/i.test(el.innerText.trim())) {
+                                                                shop = el.innerText.trim();
+                                                                break;
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+
+                                            // 5. Commission rate (multilingual: ID & EN)
+                                            let comm = '';
+                                            const m = document.body.innerText.match(/(?:Tingkat komisi|Commission rate|Commission|Komisi)[^\\d]*(\\d+(?:[\\.,]\\d+)?\\s*%)/i);
+                                            if (m) comm = m[1];
+                                            return { shop: shop, comm: comm };
+                                        }""")
+                                        shop_name = p_info.get("shop", "")
+                                        if shop_name:
+                                            first_line = shop_name.split("\n")[0].strip()
+                                            shop_name = re.sub(r"\s*(?:Toko Lokal|Toko Cross Border|Lintas Batas|Local Shop|Cross Border)\s*$", "", first_line, flags=re.I).strip()
+                                        comm_raw = p_info.get("comm", "")
+                                        comm_rate = NumberParser.parse_commission_rate(comm_raw)
+                                        break
+                                    except Exception as p_ex:
+                                        if attempt == 0:
+                                            time.sleep(1.5)
+                                        else:
+                                            logger.warning("Error loading product detail for creator product", error=str(p_ex))
 
                             item_record = {
                                 "creator_name": creator_name,
