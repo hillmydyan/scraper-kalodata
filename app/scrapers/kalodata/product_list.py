@@ -358,7 +358,7 @@ class ProductListScraper:
                 "sales_value": sales_val,
                 "commission_raw": comm_raw,
                 "commission_rate": comm_rate,
-                "currency_code": self.currency_code,
+                "currency_code": NumberParser.detect_currency(rev_raw, default_country=self.country_code),
                 "country_code": self.country_code,
                 "video_url": video_url,
                 "video_url_type": "tiktok",

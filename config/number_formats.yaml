@@ -20,10 +20,15 @@ number_formats:
     suffixes:
       K: 1000
       k: 1000
+      rb: 1000
+      ribu: 1000
       M: 1000000
       m: 1000000
+      jt: 1000000
+      juta: 1000000
       B: 1000000000
       b: 1000000000
+      Miliar: 1000000000
 
   TH:
     currency_symbol: "฿"
@@ -32,7 +37,12 @@ number_formats:
     suffixes:
       K: 1000
       k: 1000
+      rb: 1000
+      ribu: 1000
       M: 1000000
       m: 1000000
+      jt: 1000000
+      juta: 1000000
       B: 1000000000
       b: 1000000000
+      Miliar: 1000000000

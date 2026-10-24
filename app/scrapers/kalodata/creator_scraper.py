@@ -404,7 +404,7 @@ class CreatorScraper:
                                 "sales_value": sales_val,
                                 "commission_raw": comm_raw,
                                 "commission_rate": comm_rate,
-                                "currency_code": self.currency_code,
+                                "currency_code": NumberParser.detect_currency(p_rev_raw or creator_rev_raw, default_country=self.country_code),
                                 "country_code": self.country_code
                             }
                             items.append(item_record)

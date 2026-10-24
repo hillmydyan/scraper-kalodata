@@ -75,6 +75,24 @@ class TestNumberParser(unittest.TestCase):
         self.assertEqual(val, 99.99)
         self.assertFalse(abbr)
 
+    def test_cross_currency_and_region_parsing(self):
+        # Kalodata displays Rp/JT/RB when Indonesian UI is active across MY & TH
+        val, abbr = NumberParser.parse_currency_amount("Rp39,65JT", "MY")
+        self.assertEqual(val, 39650000.0)
+        self.assertTrue(abbr)
+
+        val, abbr = NumberParser.parse_currency_amount("Rp103,80RB", "MY")
+        self.assertEqual(val, 103800.0)
+        self.assertTrue(abbr)
+
+        val, abbr = NumberParser.parse_currency_amount("Rp127,98JT", "TH")
+        self.assertEqual(val, 127980000.0)
+        self.assertTrue(abbr)
+
+        self.assertEqual(NumberParser.detect_currency("Rp39,65JT", "MY"), "IDR")
+        self.assertEqual(NumberParser.detect_currency("RM 12.5K", "MY"), "MYR")
+        self.assertEqual(NumberParser.detect_currency("฿1.2M", "TH"), "THB")
+
     def test_sales_volume_parsing(self):
         self.assertEqual(NumberParser.parse_integer_sales("1.2K", "ID"), 1200)
         self.assertEqual(NumberParser.parse_integer_sales("500", "ID"), 500)
