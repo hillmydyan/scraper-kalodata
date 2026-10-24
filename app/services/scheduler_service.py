@@ -59,7 +59,7 @@ class SchedulerService:
 
         db = SessionLocal()
         try:
-            from app.models.entities import Setting, ScrapeRun
+            from app.models.entities import Setting, ScrapeRun, ScrapeJob
             setting = db.get(Setting, "schedule_config")
             if not setting or not isinstance(setting.value, dict):
                 return "No schedule_config found"
@@ -76,11 +76,42 @@ class SchedulerService:
             if current_time_str != target_time_str:
                 return f"Time mismatch: current {current_time_str} != target {target_time_str}"
 
-            # Ensure no run is currently executing to avoid profile lock collision
-            running_run = db.query(ScrapeRun).filter(ScrapeRun.status == "RUNNING").first()
-            if running_run:
-                logger.info("A scrape run is already in progress, skipping scheduled trigger", run_id=running_run.id)
-                return "A scrape run is already in progress"
+            # Auto-cleanup stale runs older than timeout (default 120 mins)
+            stale_cutoff = datetime.now(timezone.utc) - timedelta(minutes=getattr(settings, "DAILY_RUN_TIMEOUT_MINUTES", 120))
+            stale_runs = db.query(ScrapeRun).filter(
+                ScrapeRun.status == "RUNNING",
+                ScrapeRun.started_at < stale_cutoff
+            ).all()
+            for sr in stale_runs:
+                sr.status = "CANCELLED"
+                sr.finished_at = datetime.now(timezone.utc)
+                logger.info("Auto-cancelled stale scrape run", run_id=sr.id, started_at=sr.started_at)
+            if stale_runs:
+                db.commit()
+
+            # Ensure no active scrape job is currently executing to avoid profile lock collision
+            active_job = db.query(ScrapeJob).filter(ScrapeJob.status.in_(["RUNNING", "CLAIMED", "IN_PROGRESS"])).first()
+            if active_job:
+                logger.info("A scrape job is currently executing, skipping scheduled trigger", job_id=active_job.id)
+                return "A scrape job is currently executing"
+
+            # Check if there is a recently started run (< 2h) that still has active/pending jobs
+            recent_run = db.query(ScrapeRun).filter(
+                ScrapeRun.status == "RUNNING",
+                ScrapeRun.started_at >= stale_cutoff
+            ).first()
+            if recent_run:
+                pending_count = db.query(ScrapeJob).filter(
+                    ScrapeJob.run_id == recent_run.id,
+                    ScrapeJob.status.in_(["PENDING", "RUNNING", "CLAIMED", "IN_PROGRESS"])
+                ).count()
+                if pending_count > 0:
+                    logger.info("A scrape run is still active with pending jobs, skipping trigger", run_id=recent_run.id, pending=pending_count)
+                    return "A scrape run is already in progress"
+                else:
+                    recent_run.status = "COMPLETED"
+                    recent_run.finished_at = datetime.now(timezone.utc)
+                    db.commit()
 
             with cls._lock:
                 cls._last_triggered_minute = minute_key
@@ -125,6 +156,14 @@ class SchedulerService:
                                 db_exec.commit()
                         except Exception as ex:
                             logger.error("Error executing scheduled run for module", module=mod, error=str(ex))
+                            try:
+                                r_obj = db_exec.get(ScrapeRun, run_id)
+                                if r_obj:
+                                    r_obj.status = "FAILED"
+                                    r_obj.finished_at = datetime.now(timezone.utc)
+                                    db_exec.commit()
+                            except Exception:
+                                pass
                         finally:
                             db_exec.close()
 

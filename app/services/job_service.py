@@ -596,6 +596,14 @@ class JobService:
                         logger.warning("Automatic retention cleanup warning", error=str(clean_err))
                 except Exception as e:
                     logger.error("Background worker thread error", error=str(e))
+                    try:
+                        run = db.get(ScrapeRun, run_id)
+                        if run and run.status == "RUNNING":
+                            run.status = "FAILED"
+                            run.finished_at = datetime.now(timezone.utc)
+                            db.commit()
+                    except Exception:
+                        pass
                 finally:
                     db.close()
 
