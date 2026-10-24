@@ -107,6 +107,10 @@ class JobService:
             source_id = str(item["source_product_id"])
             prod_name = item.get("product_name", "Product")
             shop_name = item.get("shop_name")
+            if shop_name:
+                import re
+                first_line = str(shop_name).split("\n")[0].strip()
+                shop_name = re.sub(r"\s*(?:Toko Lokal|Toko Cross Border|Lintas Batas|Local Shop|Cross Border)\s*$", "", first_line, flags=re.I).strip()
             prod_url = item.get("product_url")
 
             # 1. Upsert products master table
@@ -209,6 +213,11 @@ class JobService:
         for item in items:
             source_id = str(item.get("source_product_id") or "")
             c_name = item.get("creator_name", "")
+            c_shop = item.get("shop_name")
+            if c_shop:
+                import re
+                first_line = str(c_shop).split("\n")[0].strip()
+                c_shop = re.sub(r"\s*(?:Toko Lokal|Toko Cross Border|Lintas Batas|Local Shop|Cross Border)\s*$", "", first_line, flags=re.I).strip()
             new_res = KalodataCreatorProductResult(
                 id=str(uuid.uuid4()),
                 scrape_job_id=job_id,
@@ -218,7 +227,7 @@ class JobService:
                 product_rank=item.get("product_rank"),
                 source_product_id=source_id,
                 product_name=item.get("product_name", ""),
-                shop_name=item.get("shop_name"),
+                shop_name=c_shop,
                 product_url=item.get("product_url"),
                 revenue_value=item.get("revenue_value"),
                 revenue_raw=item.get("revenue_raw", ""),

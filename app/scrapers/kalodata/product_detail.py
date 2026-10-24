@@ -62,7 +62,11 @@ class ProductDetailScraper:
         try:
             shop_el = self.page.locator(".bg-base-faf .text-ellipsis1, .bg-base-faf .font-bold, .bg-base-faf").first
             if shop_el.is_visible(timeout=1000):
-                shop_name = shop_el.inner_text().strip()
+                raw_shop = shop_el.inner_text().strip()
+                if raw_shop:
+                    import re
+                    first_line = raw_shop.split("\n")[0].strip()
+                    shop_name = re.sub(r"\s*(?:Toko Lokal|Toko Cross Border|Lintas Batas|Local Shop|Cross Border)\s*$", "", first_line, flags=re.I).strip()
         except Exception:
             pass
         result["shop_name"] = shop_name

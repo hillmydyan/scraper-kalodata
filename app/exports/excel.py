@@ -138,7 +138,11 @@ class ExcelExporter:
         for row_idx, item in enumerate(items, start=2):
             prod_id = str(item.get("source_product_id") or "")
             prod_name = str(item.get("product_name") or "")
-            shop_name = str(item.get("shop_name") or "")
+            shop_name = str(item.get("shop_name") or "").strip()
+            if shop_name:
+                import re
+                first_line = shop_name.split("\n")[0].strip()
+                shop_name = re.sub(r"\s*(?:Toko Lokal|Toko Cross Border|Lintas Batas|Local Shop|Cross Border)\s*$", "", first_line, flags=re.I).strip()
             prod_url = str(item.get("product_url") or "")
             rev_val = item.get("revenue_value")
             sales_val = item.get("sales_value")

@@ -379,6 +379,10 @@ class CreatorScraper:
                                         return { shop: shop, comm: comm };
                                     }""")
                                     shop_name = p_info.get("shop", "")
+                                    if shop_name:
+                                        import re
+                                        first_line = shop_name.split("\n")[0].strip()
+                                        shop_name = re.sub(r"\s*(?:Toko Lokal|Toko Cross Border|Lintas Batas|Local Shop|Cross Border)\s*$", "", first_line, flags=re.I).strip()
                                     comm_raw = p_info.get("comm", "")
                                     comm_rate = NumberParser.parse_commission_rate(comm_raw)
                                 except Exception as p_ex:
