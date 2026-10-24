@@ -308,6 +308,10 @@ class SessionManager:
             while time.time() - start_poll < max_seconds:
                 time.sleep(3)
                 try:
+                    if page.is_closed() or not context.pages:
+                        logger.info("Browser window closed by user.")
+                        break
+
                     curr_url = (page.url or "").lower()
                     # Check if user successfully submitted login and navigated away from login page without sitting on challenge
                     if "login" not in curr_url and "signin" not in curr_url and "about:blank" not in curr_url and not BaseScraper.is_challenge_active(page):

@@ -164,7 +164,7 @@ def open_login(profile_id: str):
                 try:
                     success, msg = SessionManager.launch_manual_login(
                         profile_label=label,
-                        poll_duration_min=20,
+                        poll_duration_min=15,
                         email=email,
                         password=password
                     )
@@ -173,7 +173,19 @@ def open_login(profile_id: str):
                         p = db_t.get(AccountProfile, profile_id)
                         if p:
                             p.session_status = "READY" if success else "LOGIN_REQUIRED"
+                            if success:
+                                from datetime import datetime, timezone
+                                p.last_validated_at = datetime.now(timezone.utc)
                             db_t.commit()
+
+                        if success:
+                            from app.models.entities import ScrapeJob
+                            from app.services.job_service import JobService
+                            pending_jobs = db_t.query(ScrapeJob).filter(
+                                ScrapeJob.status == "PENDING"
+                            ).all()
+                            for pj in pending_jobs:
+                                JobService.dispatch_run_in_background(pj.run_id or pj.id, limit=200, headless=True)
                     finally:
                         db_t.close()
                 except Exception as ex:

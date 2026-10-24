@@ -346,9 +346,15 @@ class JobService:
 
             scraper = BaseScraper(profile_label=profile_label)
             try:
-                scraper.acquire_lock()
+                scraper.acquire_lock(timeout_sec=20)
             except ScraperLockError as sle:
-                cls.finalize_job(db, job.id, status="FAILED", error_code="PROFILE_LOCKED", error_summary=str(sle))
+                cls.finalize_job(
+                    db,
+                    job.id,
+                    status="PENDING",
+                    error_code="PROFILE_LOCKED",
+                    error_summary="Browser sedang digunakan oleh proses lain (misal: login manual sedang dibuka). Job ditunda (PENDING) dan dapat dijalankan kembali."
+                )
                 return
 
             try:
