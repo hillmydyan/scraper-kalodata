@@ -58,6 +58,20 @@ def cmd_create_admin(args):
         db.close()
 
 
+def cmd_set_account(args):
+    """Sets credentials for the primary Kalodata account profile."""
+    init_db()
+    db = SessionLocal()
+    try:
+        profile = SessionService.get_primary_profile(db)
+        profile.account_email = args.email
+        profile.account_password = args.password
+        db.commit()
+        print(f"Akun Kalodata ({args.email}) berhasil disimpan ke database!")
+    finally:
+        db.close()
+
+
 def cmd_open_login(args):
     """Opens headful browser on DISPLAY for manual login via VNC (§7.3)."""
     init_runtime_dirs()
@@ -234,6 +248,12 @@ def main():
     p_admin.add_argument("--username", required=True, help="Admin username")
     p_admin.add_argument("--password", required=True, help="Admin password")
     p_admin.set_defaults(func=cmd_create_admin)
+
+    # set-account
+    p_set_acc = subparsers.add_parser("set-account", help="Set credentials for primary Kalodata account")
+    p_set_acc.add_argument("--email", default="pohon.cemara0706@gmail.com", help="Kalodata account email")
+    p_set_acc.add_argument("--password", default="wisnu6696!", help="Kalodata account password")
+    p_set_acc.set_defaults(func=cmd_set_account)
 
     # open-login
     p_login = subparsers.add_parser("open-login", help="Open browser on VNC DISPLAY for manual login")

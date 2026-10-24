@@ -37,7 +37,11 @@ class SessionService:
                 profile.country_scope = ["ID", "MY", "TH"]
                 if not profile.notes or "Thailand" not in profile.notes:
                     profile.notes = "Akun Utama Kalodata Multi-Region (ID, MY, TH)"
-                db.commit()
+            # Set default credentials if not yet set
+            if not profile.account_email:
+                profile.account_email = "pohon.cemara0706@gmail.com"
+                profile.account_password = "wisnu6696!"
+            db.commit()
             return profile
 
         # If no profile found, create the unified multi-region profile
@@ -47,6 +51,8 @@ class SessionService:
             country_scope=["ID", "MY", "TH"],
             profile_dir_name="indo",
             session_status="WAITING_FOR_VERIFICATION",
+            account_email="pohon.cemara0706@gmail.com",
+            account_password="wisnu6696!",
             notes="Akun Utama Kalodata Multi-Region (ID, MY, TH)"
         )
         db.add(profile)
