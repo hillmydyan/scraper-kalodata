@@ -126,7 +126,7 @@ class SessionManager:
             logger.info("Opening manual login browser for user", url=login_url, profile=profile_label)
             page.goto(login_url, wait_until="domcontentloaded")
 
-            # Auto-fill credentials if provided
+            # Auto-fill credentials and auto-submit if provided
             if email and password:
                 try:
                     time.sleep(2)
@@ -136,6 +136,21 @@ class SessionManager:
                     pwd_input = page.locator('input[type="password"]').first
                     if pwd_input.is_visible(timeout=3000):
                         pwd_input.fill(password)
+
+                    # Auto-check Remember Me if present
+                    try:
+                        remember_cb = page.locator("input[type='checkbox'], .remember-me, label:has-text('Remember')").first
+                        if remember_cb.is_visible(timeout=1000) and not remember_cb.is_checked():
+                            remember_cb.click()
+                    except Exception:
+                        pass
+
+                    # Auto-click Login / Submit button
+                    time.sleep(1)
+                    submit_btn = page.locator("button[type='submit'], button:has-text('Sign In'), button:has-text('Log In'), button:has-text('Masuk'), .login-btn").first
+                    if submit_btn.is_visible(timeout=2000):
+                        logger.info("Auto-submitting login form for Kalodata...")
+                        submit_btn.click()
                 except Exception as fill_err:
                     logger.debug("Auto-fill attempt skipped or failed", error=str(fill_err))
 
