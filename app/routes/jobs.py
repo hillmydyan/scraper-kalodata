@@ -256,3 +256,44 @@ def retry_job(job_id: str):
         return redirect(url_for("jobs.index"))
     finally:
         db.close()
+
+
+@jobs_bp.route("/jobs/open-login", methods=["POST"])
+@admin_required
+def open_login():
+    from app.services.session_service import SessionService
+    from app.tasks.celery_app import open_login_browser
+    db = SessionLocal()
+    try:
+        profile = SessionService.get_primary_profile(db)
+        profile.session_status = "WAITING_FOR_VERIFICATION"
+        db.commit()
+
+        dispatched = False
+        try:
+            open_login_browser.delay(
+                profile.profile_dir_name,
+                profile.id,
+                profile.account_email,
+                profile.account_password
+            )
+            dispatched = True
+        except Exception:
+            pass
+
+        if not dispatched:
+            import threading
+            threading.Thread(
+                target=open_login_browser,
+                args=(profile.profile_dir_name, profile.id, profile.account_email, profile.account_password),
+                daemon=True
+            ).start()
+
+        flash(
+            "Browser login dibuka di layar VNC (Port 5902) selama 15 menit. Kredensial telah otomatis terisi. "
+            "Silakan buka VNC Viewer (IP_VPS:5902). Setelah login, browser akan tertutup otomatis dan scraper akan lanjut.",
+            "info"
+        )
+        return redirect(request.referrer or url_for("jobs.index"))
+    finally:
+        db.close()

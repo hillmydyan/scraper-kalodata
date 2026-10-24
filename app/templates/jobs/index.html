@@ -4,14 +4,25 @@
 {% block title %}Jadwal & Trigger - Kurma Scraper{% endblock %}
 
 {% block content %}
-<div style="margin-bottom: 2rem;">
-  <h1 style="font-size: 1.5rem; font-weight: 800; color: var(--color-sidebar); display: flex; align-items: center; gap: 0.6rem;">
-    {{ icon('jobs', 26, stroke=2, color='var(--color-primary)') }}
-    <span>Jadwal Otomasi &amp; Trigger Scraping</span>
-  </h1>
-  <p style="color: var(--color-text-muted); font-size: 0.88rem; margin-top: 0.25rem;">
-    Atur jadwal otomatisasi harian Kalodata dan jalankan eksekusi scraper manual sewaktu-waktu.
-  </p>
+<div style="margin-bottom: 2rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+  <div>
+    <h1 style="font-size: 1.5rem; font-weight: 800; color: var(--color-sidebar); display: flex; align-items: center; gap: 0.6rem;">
+      {{ icon('jobs', 26, stroke=2, color='var(--color-primary)') }}
+      <span>Jadwal Otomasi &amp; Trigger Scraping</span>
+    </h1>
+    <p style="color: var(--color-text-muted); font-size: 0.88rem; margin-top: 0.25rem;">
+      Atur jadwal otomatisasi harian Kalodata dan jalankan eksekusi scraper manual sewaktu-waktu.
+    </p>
+  </div>
+  {% if current_user.role == 'admin' %}
+  <form method="POST" action="{{ url_for('jobs.open_login') }}" style="margin: 0;">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+    <button type="submit" class="btn-kurma-primary" style="background: #2563EB; border-color: #1D4ED8; color: #FFFFFF; font-weight: 700; gap: 0.5rem; padding: 0.6rem 1.25rem; box-shadow: 0 2px 4px rgba(37,99,235,0.25);" title="Buka browser di VNC port 5902 selama 15 menit untuk login">
+      {{ icon('external', 18, color='#FFFFFF') }}
+      <span>Buka Browser Login (VNC 5902)</span>
+    </button>
+  </form>
+  {% endif %}
 </div>
 
 <!-- Card 1: Pengaturan Jadwal Harian Kalodata -->
@@ -178,8 +189,10 @@
 
 
 
-{% if jobs and jobs|selectattr("status", "equalto", "BLOCKED")|list|length > 0 %}
-<!-- Alert Banner when any job is BLOCKED by Cloudflare -->
+{% set waiting_login_jobs = jobs|selectattr("stage", "equalto", "WAITING_LOGIN")|list if jobs else [] %}
+{% set blocked_jobs = jobs|selectattr("status", "equalto", "BLOCKED")|list if jobs else [] %}
+{% if waiting_login_jobs|length > 0 or blocked_jobs|length > 0 %}
+<!-- Alert Banner when any job is WAITING_LOGIN or BLOCKED -->
 <div style="margin-bottom: 1.5rem; background: #FFFBEB; border: 2px solid #F59E0B; border-radius: var(--radius-md); padding: 1.25rem 1.5rem; display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap;">
   <div style="display: flex; align-items: center; gap: 0.85rem;">
     <div style="background: #FDE68A; padding: 0.5rem; border-radius: 50%; color: #B45309; display: flex;">
@@ -187,14 +200,29 @@
     </div>
     <div>
       <div style="font-weight: 800; color: #92400E; font-size: 0.98rem; margin-bottom: 0.15rem;">
-        Perhatian: Ada Job Tertahan Verifikasi Cloudflare Turnstile
+        {% if waiting_login_jobs|length > 0 %}
+          Sesi Kalodata Belum Login &mdash; Scraper Menunggu Login (15 Menit)
+        {% else %}
+          Perhatian: Ada Job Tertahan Verifikasi Cloudflare Turnstile
+        {% endif %}
       </div>
       <div style="color: #78350F; font-size: 0.85rem;">
-        Silakan sambungkan <strong>VNC Viewer (Port 5902)</strong> lalu klik checkbox <em>"Verify you are human"</em>. Scraper otomatis lanjut setelah diklik.
+        Sambungkan <strong>VNC Viewer (Port 5902)</strong> ke IP VPS. Form login &amp; sandi terisi otomatis, selesaikan captcha jika muncul. Begitu login sukses, scraper otomatis lanjut!
       </div>
     </div>
   </div>
-  <span class="status-pill status-BLOCKED">MENUNGGU KLIK VNC</span>
+  <div style="display: flex; align-items: center; gap: 0.75rem;">
+    {% if current_user.role == 'admin' %}
+    <form method="POST" action="{{ url_for('jobs.open_login') }}" style="margin: 0;">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+      <button type="submit" class="btn-kurma-primary" style="background: #D97706; border-color: #B45309; color: #FFFFFF; font-weight: 700; gap: 0.4rem; padding: 0.45rem 0.9rem;">
+        {{ icon('external', 16, color='#FFFFFF') }}
+        <span>Buka Browser Login</span>
+      </button>
+    </form>
+    {% endif %}
+    <span class="status-pill status-BLOCKED">MENUNGGU VNC 5902</span>
+  </div>
 </div>
 {% endif %}
 

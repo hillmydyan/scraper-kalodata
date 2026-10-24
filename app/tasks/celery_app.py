@@ -166,11 +166,12 @@ def scrape_country_job(job_id: str, limit: int = 2000, headless: Optional[bool] 
 def open_login_browser(profile_label: str, profile_id: str, email: Optional[str] = None, password: Optional[str] = None):
     """Launches manual login browser in worker container where VNC is running."""
     from app.scrapers.kalodata.session import SessionManager
-    from app.models.entities import AccountProfile
+    from app.models.entities import AccountProfile, ScrapeJob
+    from app.services.job_service import JobService
     try:
         success, msg = SessionManager.launch_manual_login(
             profile_label=profile_label,
-            poll_duration_min=20,
+            poll_duration_min=15,
             email=email,
             password=password
         )
@@ -179,7 +180,19 @@ def open_login_browser(profile_label: str, profile_id: str, email: Optional[str]
             p = db.get(AccountProfile, profile_id)
             if p:
                 p.session_status = "READY" if success else "LOGIN_REQUIRED"
+                if success:
+                    p.last_validated_at = datetime.now(timezone.utc)
                 db.commit()
+
+            # If login succeeded, automatically resume pending jobs waiting for login
+            if success:
+                pending_jobs = db.query(ScrapeJob).filter(
+                    ScrapeJob.status == "PENDING",
+                    ScrapeJob.stage == "WAITING_LOGIN"
+                ).all()
+                for pj in pending_jobs:
+                    logger.info("Auto-resuming pending job after manual login", job_id=pj.id)
+                    JobService.dispatch_run_in_background(pj.run_id or pj.id, limit=200, headless=True)
         finally:
             db.close()
         return {"status": "SUCCESS" if success else "FAILED", "message": msg}

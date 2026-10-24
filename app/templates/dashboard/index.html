@@ -271,9 +271,18 @@
       </p>
     </div>
     {% if current_user.role == 'admin' %}
-      <a href="{{ url_for('accounts.index') }}" class="btn-kurma-secondary" style="font-size: 0.82rem;">
-        Kelola Akun &amp; Sesi
-      </a>
+      <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
+        <form method="POST" action="{{ url_for('jobs.open_login') }}" style="margin: 0;">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+          <button type="submit" class="btn-kurma-primary" style="background: #2563EB; border-color: #1D4ED8; color: #FFFFFF; font-weight: 700; gap: 0.4rem; padding: 0.45rem 0.9rem; font-size: 0.82rem;" title="Buka browser di VNC port 5902 selama 15 menit untuk login">
+            {{ icon('external', 14, color='#FFFFFF') }}
+            <span>Buka Browser Login (VNC 5902)</span>
+          </button>
+        </form>
+        <a href="{{ url_for('accounts.index') }}" class="btn-kurma-secondary" style="font-size: 0.82rem;">
+          Kelola Akun &amp; Sesi
+        </a>
+      </div>
     {% endif %}
   </div>
 
@@ -303,12 +312,20 @@
           <td style="font-size: 0.82rem;">{{ format_wib(p.last_validated_at) if p.last_validated_at else 'Belum divalidasi' }}</td>
           <td>
             {% if current_user.role == 'admin' %}
-            <form method="POST" action="{{ url_for('accounts.validate', profile_id=p.id) }}" style="display:inline;">
-              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-              <button type="submit" class="btn-kurma-secondary" style="padding: 0.35rem 0.75rem; font-size: 0.78rem;">
-                Validasi
-              </button>
-            </form>
+            <div style="display: flex; gap: 0.35rem; align-items: center;">
+              <form method="POST" action="{{ url_for('accounts.open_login', profile_id=p.id) }}" style="display:inline;">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                <button type="submit" class="btn-kurma" style="padding: 0.3rem 0.65rem; font-size: 0.78rem;" title="Buka browser login di VNC port 5902">
+                  Login VNC
+                </button>
+              </form>
+              <form method="POST" action="{{ url_for('accounts.validate', profile_id=p.id) }}" style="display:inline;">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                <button type="submit" class="btn-kurma-secondary" style="padding: 0.3rem 0.65rem; font-size: 0.78rem;">
+                  Validasi
+                </button>
+              </form>
+            </div>
             {% else %}
             -
             {% endif %}

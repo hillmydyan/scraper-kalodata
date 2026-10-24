@@ -36,8 +36,10 @@
       <span>Kembali ke Daftar Job</span>
     </a>
   </div>
-{% if job.status == 'BLOCKED' %}
-<!-- Cloudflare Turnstile Resolution Alert Banner -->
+</div>
+
+{% if job.status == 'BLOCKED' or job.stage == 'WAITING_LOGIN' %}
+<!-- Cloudflare Turnstile or Login Resolution Alert Banner -->
 <div style="margin-bottom: 2rem; background: #FFFBEB; border: 2px solid #F59E0B; border-radius: var(--radius-md); padding: 1.5rem; box-shadow: 0 4px 12px rgba(245, 158, 11, 0.12);">
   <div style="display: flex; align-items: flex-start; gap: 1.25rem;">
     <div style="background: #FDE68A; padding: 0.75rem; border-radius: 50%; color: #B45309; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
@@ -46,20 +48,39 @@
     <div style="flex: 1;">
       <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.5rem; flex-wrap: wrap;">
         <h3 style="margin: 0; color: #92400E; font-size: 1.15rem; font-weight: 800;">
-          Perhatian: Verifikasi Cloudflare Turnstile Dibutuhkan
+          {% if job.stage == 'WAITING_LOGIN' %}
+            Perhatian: Menunggu Login Manual Akun Kalodata (10-15 Menit)
+          {% else %}
+            Perhatian: Verifikasi Cloudflare Turnstile Dibutuhkan
+          {% endif %}
         </h3>
-        <span class="status-pill status-BLOCKED">BLOCKED</span>
+        <span class="status-pill status-BLOCKED">{{ job.stage if job.stage == 'WAITING_LOGIN' else 'BLOCKED' }}</span>
       </div>
       <p style="margin: 0 0 1rem 0; color: #78350F; font-size: 0.95rem; line-height: 1.6;">
-        Scraper dijeda sementara karena Cloudflare menampilkan pemeriksaan verifikasi bot.
-        Silakan buka <strong>VNC Viewer</strong> Anda dan sambungkan ke server port <strong>5902</strong> (contoh: <code>IP_VPS:5902</code>), lalu klik kotak <em>"Verify you are human"</em> menggunakan mouse Anda.
+        {% if job.stage == 'WAITING_LOGIN' %}
+          Browser login sedang terbuka di layar VNC port <strong>5902</strong> selama 15 menit. Form email dan password telah terisi otomatis. Sambungkan <strong>VNC Viewer</strong> ke <code>IP_VPS:5902</code> untuk menyelesaikan verifikasi login. Begitu login terdeteksi, scraper akan otomatis melanjutkan scraping!
+        {% else %}
+          Scraper dijeda sementara karena Cloudflare menampilkan pemeriksaan verifikasi bot.
+          Silakan buka <strong>VNC Viewer</strong> Anda dan sambungkan ke server port <strong>5902</strong> (contoh: <code>IP_VPS:5902</code>), lalu klik kotak <em>"Verify you are human"</em> menggunakan mouse Anda.
+        {% endif %}
       </p>
       <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.75rem; background: #FEF3C7; border: 1px solid #FCD34D; padding: 0.6rem 1rem; border-radius: 8px;">
         <div style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.88rem; font-weight: 700; color: #92400E;">
           <span class="blinking-dot"></span>
-          <span>Scraper otomatis melanjutkan scraping begitu verifikasi selesai diklik.</span>
+          <span>Scraper otomatis melanjutkan scraping begitu verifikasi / login selesai.</span>
         </div>
-        <span style="font-size: 0.82rem; color: #B45309; font-weight: 700;">Port VNC: 5902</span>
+        <div style="display: flex; align-items: center; gap: 0.75rem;">
+          {% if current_user.role == 'admin' %}
+          <form method="POST" action="{{ url_for('jobs.open_login') }}" style="margin: 0;">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+            <button type="submit" class="btn-kurma-primary" style="background: #D97706; border-color: #B45309; color: #FFFFFF; font-weight: 700; gap: 0.4rem; padding: 0.4rem 0.85rem; font-size: 0.85rem;">
+              {{ icon('external', 15, color='#FFFFFF') }}
+              <span>Buka Browser Login (VNC 5902)</span>
+            </button>
+          </form>
+          {% endif %}
+          <span style="font-size: 0.82rem; color: #B45309; font-weight: 700;">Port VNC: 5902</span>
+        </div>
       </div>
     </div>
   </div>

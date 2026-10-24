@@ -363,11 +363,12 @@ class JobService:
                     timeout_sec=25,
                     job_id=job.id,
                     wait_for_human=True,
-                    max_human_wait_sec=180,
+                    max_human_wait_sec=900,
                     cancel_check_cb=cancel_check
                 )
                 if status != "READY":
-                    cls.finalize_job(db, job.id, status=status, error_code=status, error_summary=msg)
+                    final_job_status = "PENDING" if status in ("LOGIN_REQUIRED", "PENDING") else status
+                    cls.finalize_job(db, job.id, status=final_job_status, error_code=status, error_summary=msg)
                     return
 
                 nav = KalodataNavigator(page)
