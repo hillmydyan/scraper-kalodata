@@ -475,9 +475,11 @@ class JobService:
                             rows_scanned=scanned_count
                         )
 
+                    is_manual = (job.run.trigger == "manual") if job.run else False
+                    effective_max = limit if (is_manual and limit and limit > 0) else None
                     min_sales = getattr(settings, "MIN_PRODUCT_SALES", 50)
                     scrape_res = list_scraper.scrape_products(
-                        max_limit=limit,
+                        max_limit=effective_max,
                         min_sales=min_sales,
                         checkpoint_cb=checkpoint_cb,
                         cancel_check_cb=cancel_check,

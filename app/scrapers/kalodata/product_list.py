@@ -34,14 +34,14 @@ class ProductListScraper:
 
     def scrape_products(
         self,
-        max_limit: int = 2000,
+        max_limit: Optional[int] = 2000,
         min_sales: Optional[int] = 50,
         checkpoint_cb: Optional[Callable[[List[Dict[str, Any]], int], None]] = None,
         cancel_check_cb: Optional[Callable[[], bool]] = None,
         revenue_source_method: str = "product_filter"
     ) -> Dict[str, Any]:
         """
-        Iterates product table rows up to max_limit or end of pages.
+        Iterates product table rows up to max_limit (or all pages if max_limit is None).
         Saves checkpoints and validates data per row.
         """
         items: List[Dict[str, Any]] = []
@@ -75,7 +75,7 @@ class ProductListScraper:
         page_number = 1
         total_scanned = 0
 
-        while len(items) < max_limit:
+        while max_limit is None or len(items) < max_limit:
             self.dismiss_overlays()
 
             # Check for Cloudflare challenge and wait for operator if needed
@@ -110,7 +110,7 @@ class ProductListScraper:
             logger.info("Processing rows on page", page=page_number, count=len(rows))
 
             for row_idx, row in enumerate(rows):
-                if len(items) >= max_limit:
+                if max_limit is not None and len(items) >= max_limit:
                     is_truncated = True
                     break
 
