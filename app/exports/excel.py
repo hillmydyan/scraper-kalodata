@@ -7,6 +7,7 @@ Follows rules in PRD §10:
 """
 
 import os
+import re
 import hashlib
 from datetime import datetime, date
 from pathlib import Path
@@ -140,7 +141,6 @@ class ExcelExporter:
             prod_name = str(item.get("product_name") or "")
             shop_name = str(item.get("shop_name") or "").strip()
             if shop_name:
-                import re
                 first_line = shop_name.split("\n")[0].strip()
                 shop_name = re.sub(r"\s*(?:Toko Lokal|Toko Cross Border|Lintas Batas|Local Shop|Cross Border)\s*$", "", first_line, flags=re.I).strip()
             prod_url = str(item.get("product_url") or "")

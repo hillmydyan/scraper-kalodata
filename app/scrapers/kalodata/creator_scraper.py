@@ -229,12 +229,14 @@ class CreatorScraper:
 
                         if creator_rev_val < effective_min:
                             logger.info(
-                                "Creator revenue below minimum threshold - stopping creator scrape",
+                                "Creator revenue below minimum threshold",
                                 revenue=creator_rev_val,
                                 raw_revenue=creator_rev_raw,
                                 threshold=effective_min,
-                                creators_scanned=total_creators_scanned
+                                manual_mode=bool(max_creators)
                             )
+                            if max_creators:
+                                continue
                             stop_scraping = True
                             break
 
@@ -380,7 +382,6 @@ class CreatorScraper:
                                     }""")
                                     shop_name = p_info.get("shop", "")
                                     if shop_name:
-                                        import re
                                         first_line = shop_name.split("\n")[0].strip()
                                         shop_name = re.sub(r"\s*(?:Toko Lokal|Toko Cross Border|Lintas Batas|Local Shop|Cross Border)\s*$", "", first_line, flags=re.I).strip()
                                     comm_raw = p_info.get("comm", "")

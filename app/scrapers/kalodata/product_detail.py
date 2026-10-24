@@ -3,6 +3,7 @@ Product detail page scraper and video selection engine.
 Follows rules in PRD §6.4, §6.7, and §6.8.
 """
 
+import re
 from typing import Dict, Any, Optional, List, Tuple
 import structlog
 from playwright.sync_api import Page
@@ -64,7 +65,6 @@ class ProductDetailScraper:
             if shop_el.is_visible(timeout=1000):
                 raw_shop = shop_el.inner_text().strip()
                 if raw_shop:
-                    import re
                     first_line = raw_shop.split("\n")[0].strip()
                     shop_name = re.sub(r"\s*(?:Toko Lokal|Toko Cross Border|Lintas Batas|Local Shop|Cross Border)\s*$", "", first_line, flags=re.I).strip()
         except Exception:
@@ -78,7 +78,6 @@ class ProductDetailScraper:
             comm_el = self.page.locator("text=/Tingkat komisi/i").first
             if comm_el.is_visible(timeout=1000):
                 comm_text = comm_el.inner_text().strip()
-                import re
                 cm = re.search(r"(\d+(?:[\.,]\d+)?\s*%)", comm_text)
                 if cm:
                     commission_raw = cm.group(1)

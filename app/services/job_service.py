@@ -4,6 +4,7 @@ Follows rules in PRD §8.2, §8.3, §8.5, and §11.
 """
 
 import os
+import re
 import sys
 import uuid
 from datetime import datetime, date, timedelta, timezone
@@ -108,7 +109,6 @@ class JobService:
             prod_name = item.get("product_name", "Product")
             shop_name = item.get("shop_name")
             if shop_name:
-                import re
                 first_line = str(shop_name).split("\n")[0].strip()
                 shop_name = re.sub(r"\s*(?:Toko Lokal|Toko Cross Border|Lintas Batas|Local Shop|Cross Border)\s*$", "", first_line, flags=re.I).strip()
             prod_url = item.get("product_url")
@@ -215,7 +215,6 @@ class JobService:
             c_name = item.get("creator_name", "")
             c_shop = item.get("shop_name")
             if c_shop:
-                import re
                 first_line = str(c_shop).split("\n")[0].strip()
                 c_shop = re.sub(r"\s*(?:Toko Lokal|Toko Cross Border|Lintas Batas|Local Shop|Cross Border)\s*$", "", first_line, flags=re.I).strip()
             new_res = KalodataCreatorProductResult(
