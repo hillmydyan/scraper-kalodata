@@ -170,6 +170,21 @@ class CreatorScraper:
         items: List[Dict[str, Any]] = []
         total_creators_scanned = 0
         stop_scraping = False
+        consecutive_below_min = 0
+
+        # Try to expand page size to 50 if available
+        try:
+            size_trigger = self.page.locator('button[data-slot="select-trigger"]:has-text("Halaman"), button[data-slot="select-trigger"]:has-text("Page")').first
+            if size_trigger.is_visible(timeout=1500):
+                size_trigger.click()
+                self.page.wait_for_timeout(500)
+                opt_50 = self.page.locator('[role="option"]:has-text("50"), [data-slot="select-item"]:has-text("50")').first
+                if opt_50.is_visible(timeout=1000):
+                    opt_50.click()
+                    self.page.wait_for_timeout(2000)
+                    BaseScraper.pacing_page_delay()
+        except Exception:
+            pass
 
         # Tab for inspecting individual product details
         prod_tab = self.page.context.new_page()
@@ -426,14 +441,37 @@ class CreatorScraper:
                     break
 
                 try:
-                    next_btn = self.page.locator("button[aria-label='Go to next page'], button.btn-next, .pagination-next, button:has-text('Next')").first
-                    if next_btn.is_visible(timeout=1500) and next_btn.is_enabled():
-                        next_btn.click(force=True)
-                        self.page.wait_for_timeout(2500)
-                        BaseScraper.pacing_page_delay()
-                    else:
+                    next_selectors = [
+                        "nav button[aria-label*='berikutnya' i]",
+                        "nav button[aria-label*='next' i]",
+                        "button[data-slot='pagination-link'][aria-label*='berikutnya' i]",
+                        "button[data-slot='pagination-link'][aria-label*='next' i]",
+                        "nav ul li:last-child button",
+                        "button[aria-label='Go to next page']",
+                        "button.btn-next",
+                        ".pagination-next",
+                        "button:has-text('Next')"
+                    ]
+                    clicked_next = False
+                    for n_sel in next_selectors:
+                        btn = self.page.locator(n_sel).first
+                        if btn.is_visible(timeout=1000) and btn.is_enabled():
+                            aria_dis = btn.get_attribute("aria-disabled")
+                            data_dis = btn.get_attribute("data-disabled")
+                            cls_str = btn.get_attribute("class") or ""
+                            if aria_dis == "true" or data_dis == "true" or "disabled" in cls_str:
+                                continue
+                            btn.click(force=True)
+                            clicked_next = True
+                            self.page.wait_for_timeout(2500)
+                            BaseScraper.pacing_page_delay()
+                            break
+
+                    if not clicked_next:
+                        logger.info("No next page button found or disabled. Reached end of creator list.", total_scanned=total_creators_scanned)
                         break
-                except Exception:
+                except Exception as p_ex:
+                    logger.warning("Pagination error", error=str(p_ex))
                     break
 
         finally:
