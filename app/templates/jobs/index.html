@@ -44,14 +44,43 @@
 
     <div class="form-grid-3">
       <div class="form-group">
-        <label class="form-label" for="schedule_time">Jam Eksekusi Harian (WIB)</label>
-        <div class="input-with-icon">
-          <input type="text" id="schedule_time" name="schedule_time" value="{{ schedule_config.time }}" class="form-input" placeholder="12:00 PM" required>
-          <span class="input-icon-right">
-            {{ icon('clock', 18, color='var(--color-text-muted)') }}
-          </span>
+        <label class="form-label">Jam Eksekusi Harian (WIB)</label>
+        <div style="display: flex; align-items: center; gap: 0.4rem;">
+          <div style="flex: 1.2;">
+            <select id="select_hour" name="schedule_hour" class="form-select" style="font-weight: 700; text-align: center; font-size: 0.95rem; padding: 0.5rem 0.4rem; cursor: pointer;">
+              {% for h in range(24) %}
+                {% set h_str = "%02d"|format(h) %}
+                <option value="{{ h_str }}" {% if schedule_config.selected_hour == h_str %}selected{% endif %}>
+                  {{ h_str }} {% if h == 12 %}(12 Siang){% elif h == 0 %}(00 Malam){% elif h == 6 %}(Pagi){% elif h == 18 %}(Sore){% endif %}
+                </option>
+              {% endfor %}
+            </select>
+          </div>
+          <span style="font-weight: 800; font-size: 1.25rem; color: var(--color-text-muted);">:</span>
+          <div style="flex: 1;">
+            <select id="select_minute" name="schedule_minute" class="form-select" style="font-weight: 700; text-align: center; font-size: 0.95rem; padding: 0.5rem 0.4rem; cursor: pointer;">
+              {% for m in range(60) %}
+                {% set m_str = "%02d"|format(m) %}
+                <option value="{{ m_str }}" {% if schedule_config.selected_minute == m_str %}selected{% endif %}>
+                  {{ m_str }}
+                </option>
+              {% endfor %}
+            </select>
+          </div>
+          <span style="font-weight: 700; font-size: 0.85rem; color: var(--color-text-muted); background: #F1F5F9; border: 1px solid var(--color-border-subtle); border-radius: 6px; padding: 0.52rem 0.65rem;">WIB</span>
         </div>
-        <div class="field-hint">Waktu server lokal. Saat ini: <strong>{{ schedule_config.current_time_wib }}</strong></div>
+
+        <input type="hidden" id="schedule_time" name="schedule_time" value="{{ schedule_config.time_24 or '12:00' }}">
+
+        <!-- Quick Shortcut Pills (Tinggal Klik) -->
+        <div style="display: flex; gap: 0.35rem; margin-top: 0.45rem; flex-wrap: wrap; align-items: center;">
+          <button type="button" class="btn-time-chip" onclick="setTime('12', '00')">12:00 Siang</button>
+          <button type="button" class="btn-time-chip" onclick="setTime('13', '15')">13:15</button>
+          <button type="button" class="btn-time-chip" onclick="setTime('01', '10')">01:10</button>
+          <button type="button" class="btn-time-chip chip-test" onclick="setNextMinutes(2)">+2 Mnt (Tes)</button>
+        </div>
+
+        <div class="field-hint" style="margin-top: 0.35rem;">Pilih jam &amp; menit (bisa scroll/klik). Saat ini: <strong>{{ schedule_config.current_time_wib }}</strong></div>
       </div>
 
       <div class="form-group">
@@ -339,4 +368,62 @@
   }
 </style>
 {% endif %}
+
+<script>
+  function updateScheduleHidden() {
+    const h = document.getElementById('select_hour');
+    const m = document.getElementById('select_minute');
+    const hidden = document.getElementById('schedule_time');
+    if (h && m && hidden) {
+      hidden.value = h.value + ':' + m.value;
+    }
+  }
+
+  const hEl = document.getElementById('select_hour');
+  const mEl = document.getElementById('select_minute');
+  if (hEl) hEl.addEventListener('change', updateScheduleHidden);
+  if (mEl) mEl.addEventListener('change', updateScheduleHidden);
+
+  function setTime(h, m) {
+    if (hEl) hEl.value = h;
+    if (mEl) mEl.value = m;
+    updateScheduleHidden();
+  }
+
+  function setNextMinutes(minsToAdd) {
+    const now = new Date();
+    now.setMinutes(now.getMinutes() + minsToAdd);
+    const h = String(now.getHours()).padStart(2, '0');
+    const m = String(now.getMinutes()).padStart(2, '0');
+    setTime(h, m);
+  }
+</script>
+<style>
+  .btn-time-chip {
+    background: #F8FAFC;
+    border: 1px solid var(--color-border-subtle, #E2E8F0);
+    border-radius: 5px;
+    padding: 0.2rem 0.55rem;
+    font-size: 0.75rem;
+    color: var(--color-text, #334155);
+    cursor: pointer;
+    font-weight: 600;
+    transition: all 0.15s ease;
+  }
+  .btn-time-chip:hover {
+    background: #EFF6FF;
+    color: #2563EB;
+    border-color: #93C5FD;
+  }
+  .btn-time-chip.chip-test {
+    background: #EFF6FF;
+    color: #1D4ED8;
+    border-color: #BFDBFE;
+    font-weight: 700;
+  }
+  .btn-time-chip.chip-test:hover {
+    background: #DBEAFE;
+    border-color: #3B82F6;
+  }
+</style>
 {% endblock %}

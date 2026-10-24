@@ -41,13 +41,20 @@ def index():
             schedule_config["current_time_wib"] = now_wib
         else:
             schedule_config = {
-                "time": "01:10 AM",
+                "time": "12:00",
                 "target_limit": 200,
                 "target_region": "ALL",
                 "module": "creator",
                 "auto_schedule": True,
                 "current_time_wib": now_wib
             }
+
+        from app.services.scheduler_service import parse_schedule_time
+        saved_24 = parse_schedule_time(schedule_config.get("time", "12:00")) or "12:00"
+        parts = saved_24.split(":")
+        schedule_config["selected_hour"] = parts[0] if len(parts) == 2 else "12"
+        schedule_config["selected_minute"] = parts[1] if len(parts) == 2 else "00"
+        schedule_config["time_24"] = saved_24
 
         # Load saved manual trigger configuration from Setting table if available
         saved_manual = db.get(Setting, "manual_config")
@@ -76,7 +83,18 @@ def index():
 @jobs_bp.route("/jobs/save-schedule", methods=["POST"])
 @admin_required
 def save_schedule():
-    schedule_time = request.form.get("schedule_time", "01:10 AM")
+    schedule_hour = request.form.get("schedule_hour")
+    schedule_minute = request.form.get("schedule_minute")
+    if schedule_hour is not None and schedule_minute is not None:
+        try:
+            h_int = int(schedule_hour)
+            m_int = int(schedule_minute)
+            schedule_time = f"{h_int:02d}:{m_int:02d}"
+        except ValueError:
+            schedule_time = request.form.get("schedule_time", "12:00")
+    else:
+        schedule_time = request.form.get("schedule_time", "12:00")
+
     target_limit_str = request.form.get("target_limit", "200")
     target_region = request.form.get("target_region", "ALL")
     module = request.form.get("module", "creator")
