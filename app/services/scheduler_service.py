@@ -88,31 +88,34 @@ class SchedulerService:
             yesterday = (now_wib - timedelta(days=1)).date()
             region = cfg.get("target_region", "ALL")
             target_countries = None if region == "ALL" else [region]
-            module = cfg.get("module", "creator")
-            headless = getattr(settings, "KALODATA_HEADLESS", False)
+            modules_to_run = ["creator", "product"] if module == "both" else [module]
+            triggered_runs = []
 
             from app.services.job_service import JobService
-            run = JobService.create_daily_run(
-                db,
-                period_date=yesterday,
-                trigger="scheduled",
-                created_by="auto_scheduler",
-                countries=target_countries,
-                module=module
-            )
-            db.commit()
+            for mod in modules_to_run:
+                run = JobService.create_daily_run(
+                    db,
+                    period_date=yesterday,
+                    trigger="scheduled",
+                    created_by="auto_scheduler",
+                    countries=target_countries,
+                    module=mod
+                )
+                db.commit()
 
-            logger.info(
-                "Auto schedule triggered successfully!",
-                run_id=run.id,
-                module=module,
-                region=region,
-                time=target_time_str
-            )
+                logger.info(
+                    "Auto schedule triggered successfully!",
+                    run_id=run.id,
+                    module=mod,
+                    region=region,
+                    time=target_time_str
+                )
 
-            # Limit is None for scheduled runs to scrape all valid rows matching thresholds
-            JobService.dispatch_run_in_background(run.id, limit=None, headless=headless)
-            return f"Triggered scheduled run {run.id}"
+                # Limit is None for scheduled runs to scrape all valid rows matching thresholds
+                JobService.dispatch_run_in_background(run.id, limit=None, headless=headless)
+                triggered_runs.append(run.id)
+
+            return f"Triggered scheduled run(s): {', '.join(triggered_runs)}"
         except Exception as e:
             logger.error("Error evaluating auto-schedule", error=str(e), exc_info=True)
             return f"Error: {e}"

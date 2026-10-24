@@ -88,6 +88,7 @@
         <select id="schedule_module" name="module" class="form-select">
           <option value="creator" {% if schedule_config.module == 'creator' %}selected{% endif %}>Menu Kreator (Kreator + 3 Produk Terlaris)</option>
           <option value="product" {% if schedule_config.module == 'product' %}selected{% endif %}>Menu Produk (Katalog Produk Kalodata)</option>
+          <option value="both" {% if schedule_config.module == 'both' %}selected{% endif %}>Keduanya (Kreator + 3 Produk &amp; Katalog Produk)</option>
         </select>
         <div class="field-hint">Modul data Kalodata yang ditarik saat jadwal otomatis berjalan.</div>
       </div>
