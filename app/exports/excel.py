@@ -16,6 +16,7 @@ import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
 import zoneinfo
+from decimal import Decimal
 
 from app.config import settings, get_country_config
 
@@ -268,15 +269,49 @@ class ExcelExporter:
         # Enable AutoFilter
         ws_data.auto_filter.ref = f"A1:{get_column_letter(len(headers))}{max(len(items) + 1, 1)}"
 
-        # Adjust column widths automatically
+        # Adjust column widths automatically with accurate formatted length estimation
         for col in ws_data.columns:
             max_len = 0
             col_letter = get_column_letter(col[0].column)
+            header_val = str(col[0].value or "")
             for cell in col:
                 val = str(cell.value or "")
+                # If numeric with custom format, compute formatted representation length
+                if cell.value is not None and isinstance(cell.value, (int, float, Decimal)):
+                    fmt = str(cell.number_format or "")
+                    if fmt and fmt != "General":
+                        if "0.00%" in fmt:
+                            val = f"{float(cell.value) * 100:.2f}%"
+                        elif "#,##0.00" in fmt:
+                            val = f"{currency_symbol} {float(cell.value):,.2f}"
+                        elif "#,##0" in fmt and "Rp" in fmt:
+                            val = f"{currency_symbol} {float(cell.value):,.0f}"
+                        elif "#,##0" in fmt:
+                            val = f"{int(cell.value):,}"
+
                 if len(val) > max_len:
                     max_len = len(val)
-            ws_data.column_dimensions[col_letter].width = min(max(max_len + 3, 12), 45)
+
+            # Determine generous minimum column width based on column type
+            min_width = 14
+            if "Pendapatan" in header_val:
+                min_width = 24
+            elif "Penjualan" in header_val:
+                min_width = 18
+            elif "Tingkat Komisi" in header_val or "Komisi" in header_val:
+                min_width = 16
+            elif "ID Produk" in header_val:
+                min_width = 24
+            elif "Nama Kreator" in header_val:
+                min_width = 26
+            elif "Periode Data" in header_val:
+                min_width = 16
+            elif "Waktu Scraping" in header_val:
+                min_width = 26
+            elif "Job ID" in header_val:
+                min_width = 38
+
+            ws_data.column_dimensions[col_letter].width = min(max(max_len + 5, min_width), 50)
 
         # 2. SHEET: Info
         ws_info = wb.create_sheet(title="Info")
