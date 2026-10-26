@@ -74,7 +74,7 @@ class Settings:
     MIN_CREATOR_REVENUE_IDR: float = float(APP_CONFIG.get("scraping", {}).get("min_creator_revenue_idr", 50000000))
     MIN_CREATOR_REVENUE_MYR: float = float(APP_CONFIG.get("scraping", {}).get("min_creator_revenue_myr", 14000))
     MIN_CREATOR_REVENUE_THB: float = float(APP_CONFIG.get("scraping", {}).get("min_creator_revenue_thb", 110000))
-    MIN_PRODUCT_SALES: int = int(APP_CONFIG.get("scraping", {}).get("min_product_sales", 50))
+    MIN_PRODUCT_SALES: int = int(APP_CONFIG.get("scraping", {}).get("min_product_sales", 150))
     CHECKPOINT_EVERY: int = APP_CONFIG.get("scraping", {}).get("checkpoint_every", 25)
     MAX_REJECT_RATIO: float = APP_CONFIG.get("scraping", {}).get("max_reject_ratio", 0.20)
     DELAY_PAGE_MIN: float = APP_CONFIG.get("scraping", {}).get("delay_page_min_sec", 2.0)

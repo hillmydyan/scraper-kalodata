@@ -35,7 +35,7 @@ class ProductListScraper:
     def scrape_products(
         self,
         max_limit: Optional[int] = 2000,
-        min_sales: Optional[int] = 50,
+        min_sales: Optional[int] = 150,
         checkpoint_cb: Optional[Callable[[List[Dict[str, Any]], int], None]] = None,
         cancel_check_cb: Optional[Callable[[], bool]] = None,
         revenue_source_method: str = "product_filter"
@@ -402,7 +402,7 @@ class ProductListScraper:
             logger.warning("Error parsing table row", error=str(e))
             return None
 
-    def _validate_row(self, row: Dict[str, Any], min_sales: Optional[int] = 50) -> Tuple[bool, str]:
+    def _validate_row(self, row: Dict[str, Any], min_sales: Optional[int] = 150) -> Tuple[bool, str]:
         """Validates row according to PRD §6.10."""
         if not row.get("source_product_id"):
             return False, "MISSING_PRODUCT_ID"
