@@ -233,15 +233,15 @@ class CreatorScraper:
                     creator_rev_raw = tds[2].inner_text().strip()
                     creator_rev_val, _ = NumberParser.parse_currency_amount(creator_rev_raw, self.country_code)
 
-                    # Threshold check (min_revenue, default 4,000,000 IDR)
+                    # Threshold check (min_revenue, default 50,000,000 IDR / 14,000 MYR / 110,000 THB)
                     if min_revenue and creator_rev_val is not None:
                         effective_min = min_revenue
                         is_myr = "RM" in creator_rev_raw.upper() or (self.country_code == "MY" and "RP" not in creator_rev_raw.upper())
                         is_thb = "THB" in creator_rev_raw.upper() or "฿" in creator_rev_raw or (self.country_code == "TH" and "RP" not in creator_rev_raw.upper())
-                        if is_myr:
-                            effective_min = min_revenue / 3600.0  # ~1100 MYR
-                        elif is_thb:
-                            effective_min = min_revenue / 460.0   # ~8700 THB
+                        if is_myr and effective_min >= 1_000_000:
+                            effective_min = getattr(settings, "MIN_CREATOR_REVENUE_MYR", 14000.0)
+                        elif is_thb and effective_min >= 1_000_000:
+                            effective_min = getattr(settings, "MIN_CREATOR_REVENUE_THB", 110000.0)
 
                         if creator_rev_val < effective_min:
                             logger.info(
@@ -249,6 +249,7 @@ class CreatorScraper:
                                 revenue=creator_rev_val,
                                 raw_revenue=creator_rev_raw,
                                 threshold=effective_min,
+                                country=self.country_code,
                                 manual_mode=bool(max_creators)
                             )
                             if max_creators:

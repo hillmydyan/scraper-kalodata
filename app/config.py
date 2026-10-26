@@ -71,7 +71,9 @@ class Settings:
 
     # Scraper & scheduler params
     MAX_PRODUCTS_PER_COUNTRY: int = APP_CONFIG.get("scraping", {}).get("max_products_per_country", 2000)
-    MIN_CREATOR_REVENUE_IDR: float = float(APP_CONFIG.get("scraping", {}).get("min_creator_revenue_idr", 4000000))
+    MIN_CREATOR_REVENUE_IDR: float = float(APP_CONFIG.get("scraping", {}).get("min_creator_revenue_idr", 50000000))
+    MIN_CREATOR_REVENUE_MYR: float = float(APP_CONFIG.get("scraping", {}).get("min_creator_revenue_myr", 14000))
+    MIN_CREATOR_REVENUE_THB: float = float(APP_CONFIG.get("scraping", {}).get("min_creator_revenue_thb", 110000))
     MIN_PRODUCT_SALES: int = int(APP_CONFIG.get("scraping", {}).get("min_product_sales", 50))
     CHECKPOINT_EVERY: int = APP_CONFIG.get("scraping", {}).get("checkpoint_every", 25)
     MAX_REJECT_RATIO: float = APP_CONFIG.get("scraping", {}).get("max_reject_ratio", 0.20)

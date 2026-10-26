@@ -417,7 +417,15 @@ class JobService:
                     # Limit is only an upper bound for manual trigger; scheduled runs stop purely when revenue drops below min_rev
                     is_manual = (job.run.trigger == "manual") if job.run else False
                     effective_max = limit if (is_manual and limit and limit > 0) else None
-                    min_rev = getattr(settings, "MIN_CREATOR_REVENUE_IDR", 4000000.0)
+
+                    # Determine country-specific minimum creator revenue threshold
+                    c_code = (job.country_code or "ID").upper()
+                    if c_code == "MY":
+                        min_rev = getattr(settings, "MIN_CREATOR_REVENUE_MYR", 14000.0)
+                    elif c_code == "TH":
+                        min_rev = getattr(settings, "MIN_CREATOR_REVENUE_THB", 110000.0)
+                    else:
+                        min_rev = getattr(settings, "MIN_CREATOR_REVENUE_IDR", 50000000.0)
 
                     scrape_res = creator_scraper.scrape_creators(
                         max_creators=effective_max,

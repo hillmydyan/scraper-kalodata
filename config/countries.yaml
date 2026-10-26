@@ -5,18 +5,21 @@ countries:
     currency_symbol: "Rp"
     region_label: "Indonesia"
     expected_indicator: "ID"
+    min_creator_revenue: 50000000
   MY:
     name: "Malaysia"
     currency_code: "MYR"
     currency_symbol: "RM"
     region_label: "Malaysia"
     expected_indicator: "MY"
+    min_creator_revenue: 14000
   TH:
     name: "Thailand"
     currency_code: "THB"
     currency_symbol: "฿"
     region_label: "Thailand"
     expected_indicator: "TH"
+    min_creator_revenue: 110000
 
 execution_order:
   - "ID"

@@ -71,9 +71,9 @@ class TestCreatorScraperRevenueThreshold:
             row.locator.return_value.all.return_value = [td0, td1, td2]
             return row
 
-        row1 = make_mock_row("1", "@creator1", "Rp 20M")
-        row2 = make_mock_row("2", "@creator2", "Rp 18M")
-        row3 = make_mock_row("3", "@creator3", "Rp 15M")
+        row1 = make_mock_row("1", "@creator1", "Rp 80M")
+        row2 = make_mock_row("2", "@creator2", "Rp 70M")
+        row3 = make_mock_row("3", "@creator3", "Rp 60M")
 
         page.locator.return_value.all.return_value = [row1, row2, row3]
 
@@ -85,7 +85,100 @@ class TestCreatorScraperRevenueThreshold:
         context.expect_page.return_value.__enter__.return_value = MagicMock(value=detail_tab)
 
         scraper = CreatorScraper(page, "ID")
-        # Manual cap of 1: even though all rows are > 4jt, manual cap limits to 1
-        res = scraper.scrape_creators(max_creators=1, min_revenue=4000000.0)
+        # Manual cap of 1: even though all rows are > 50jt, manual cap limits to 1
+        res = scraper.scrape_creators(max_creators=1, min_revenue=50000000.0)
         assert res["total_creators"] == 1
         assert len(res["items"]) == 1
+
+    def test_creator_revenue_filter_50m_idr(self):
+        page = MagicMock()
+        context = MagicMock()
+        page.context = context
+        prod_tab = MagicMock()
+        context.new_page.return_value = prod_tab
+
+        def make_mock_row(rank_str, name_str, rev_str):
+            row = MagicMock()
+            td0 = MagicMock()
+            td0.inner_text.return_value = rank_str
+            td1 = MagicMock()
+            td1.inner_text.return_value = name_str
+            td1.locator.return_value.first = MagicMock(count=lambda: 0)
+            td2 = MagicMock()
+            td2.inner_text.return_value = rev_str
+            row.locator.return_value.all.return_value = [td0, td1, td2]
+            return row
+
+        # Row 1: Rp 120JT (> 50jt) -> included
+        # Row 2: Rp 60JT (> 50jt)  -> included
+        # Row 3: Rp 45JT (< 50jt)  -> stops!
+        # Row 4: Rp 30JT (< 50jt)  -> skipped!
+        row1 = make_mock_row("1", "@creator1", "Rp 120JT")
+        row2 = make_mock_row("2", "@creator2", "Rp 60JT")
+        row3 = make_mock_row("3", "@creator3", "Rp 45JT")
+        row4 = make_mock_row("4", "@creator4", "Rp 30JT")
+        page.locator.return_value.all.return_value = [row1, row2, row3, row4]
+
+        detail_tab = MagicMock()
+        detail_tab.is_closed.return_value = False
+        detail_tab.evaluate.return_value = [
+            {"index": 1, "rowKey": "p1", "name": "Prod 1", "revenue": "Rp 1JT", "sales": "100"}
+        ]
+        context.expect_page.return_value.__enter__.return_value = MagicMock(value=detail_tab)
+
+        scraper = CreatorScraper(page, "ID")
+        res = scraper.scrape_creators(max_creators=None, min_revenue=50000000.0)
+        assert res["total_creators"] == 2
+        assert len(res["items"]) == 2
+
+    def test_creator_revenue_filter_myr_and_thb(self):
+        page = MagicMock()
+        context = MagicMock()
+        page.context = context
+        prod_tab = MagicMock()
+        context.new_page.return_value = prod_tab
+
+        def make_mock_row(rank_str, name_str, rev_str):
+            row = MagicMock()
+            td0 = MagicMock()
+            td0.inner_text.return_value = rank_str
+            td1 = MagicMock()
+            td1.inner_text.return_value = name_str
+            td1.locator.return_value.first = MagicMock(count=lambda: 0)
+            td2 = MagicMock()
+            td2.inner_text.return_value = rev_str
+            row.locator.return_value.all.return_value = [td0, td1, td2]
+            return row
+
+        # Test Malaysia (threshold 14000 MYR):
+        # Row 1: RM 25K (> 14K)
+        # Row 2: RM 15K (> 14K)
+        # Row 3: RM 10K (< 14K) -> stops!
+        row_my1 = make_mock_row("1", "@my_c1", "RM 25K")
+        row_my2 = make_mock_row("2", "@my_c2", "RM 15K")
+        row_my3 = make_mock_row("3", "@my_c3", "RM 10K")
+        page.locator.return_value.all.return_value = [row_my1, row_my2, row_my3]
+
+        detail_tab = MagicMock()
+        detail_tab.is_closed.return_value = False
+        detail_tab.evaluate.return_value = [
+            {"index": 1, "rowKey": "p1", "name": "Prod 1", "revenue": "RM 500", "sales": "10"}
+        ]
+        context.expect_page.return_value.__enter__.return_value = MagicMock(value=detail_tab)
+
+        scraper_my = CreatorScraper(page, "MY")
+        res_my = scraper_my.scrape_creators(max_creators=None, min_revenue=14000.0)
+        assert res_my["total_creators"] == 2
+
+        # Test Thailand (threshold 110000 THB):
+        # Row 1: ฿ 200K (> 110K)
+        # Row 2: ฿ 120K (> 110K)
+        # Row 3: ฿ 80K (< 110K) -> stops!
+        row_th1 = make_mock_row("1", "@th_c1", "฿ 200K")
+        row_th2 = make_mock_row("2", "@th_c2", "฿ 120K")
+        row_th3 = make_mock_row("3", "@th_c3", "฿ 80K")
+        page.locator.return_value.all.return_value = [row_th1, row_th2, row_th3]
+
+        scraper_th = CreatorScraper(page, "TH")
+        res_th = scraper_th.scrape_creators(max_creators=None, min_revenue=110000.0)
+        assert res_th["total_creators"] == 2
