@@ -18,14 +18,13 @@ echo "================================================================="
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 APP_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 
-# Jika aplikasi dijalankan di luar /opt/kalodata, buat symlink atau gunakan APP_DIR
+# Jika aplikasi dijalankan di luar /opt/kalodata, buat symlink dari APP_DIR
 TARGET_DIR="/opt/kalodata"
 if [ "$APP_DIR" != "$TARGET_DIR" ]; then
-    echo "[INFO] Menyiapkan target direktori $TARGET_DIR..."
+    echo "[INFO] Menyiapkan target direktori $TARGET_DIR -> $APP_DIR..."
     mkdir -p /opt
-    if [ ! -d "$TARGET_DIR" ]; then
-        ln -s "$APP_DIR" "$TARGET_DIR"
-    fi
+    rm -rf "$TARGET_DIR"
+    ln -s "$APP_DIR" "$TARGET_DIR"
 fi
 
 # 3. Update repositori sistem & pasang dependensi OS

@@ -2,8 +2,8 @@
 # Script to launch virtual X display and VNC server for Kalodata scraper
 set -e
 
-DISPLAY_NUM="${VNC_DISPLAY:-:2}"
-RFB_PORT="${VNC_PORT:-5902}"
+DISPLAY_NUM="${VNC_DISPLAY:-:1}"
+RFB_PORT="${VNC_PORT:-5901}"
 GEOMETRY="1440x900x24"
 DISP_ID="${DISPLAY_NUM#:}"
 
