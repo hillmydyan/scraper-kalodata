@@ -140,6 +140,10 @@ class BaseScraper:
         try:
             import redis
             r = redis.Redis.from_url(settings.REDIS_URL, socket_timeout=2)
+            r.delete(f"lock:profile:{profile_label}")
+        except Exception:
+            pass
+
         # Clean Chrome Singleton locks across runtime profiles
         for base_p in [settings.RUNTIME_DIR / "chrome_profile", settings.RUNTIME_DIR / "profiles" / "kalodata" / profile_label]:
             for lock_name in ("SingletonLock", "SingletonCookie", "SingletonSocket"):
