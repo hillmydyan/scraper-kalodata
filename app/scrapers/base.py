@@ -190,6 +190,10 @@ class BaseScraper:
             "--disable-infobars",
             "--no-first-run",
             "--no-default-browser-check",
+            "--disable-features=Translate,OptimizationHints,MediaRouter",
+            "--disable-background-networking",
+            "--disable-default-apps",
+            "--disable-sync",
         ]
         if headless:
             args.extend([
@@ -205,21 +209,22 @@ class BaseScraper:
             display=env.get("DISPLAY")
         )
 
-        if sys.platform == "win32":
-            user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
-        else:
-            user_agent = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
         kwargs = {
             "user_data_dir": str(self.profile_dir),
             "headless": headless,
             "slow_mo": slow_mo,
             "args": args,
+            "ignore_default_args": ["--enable-automation"],
             "viewport": {"width": 1440, "height": 900},
-            "user_agent": user_agent,
             "env": env,
         }
         if channel:
             kwargs["channel"] = channel
+        else:
+            if sys.platform == "win32":
+                kwargs["user_agent"] = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36"
+            else:
+                kwargs["user_agent"] = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36"
 
         # Clean stale Chrome Singleton locks from previous container crashes/restarts
         for lock_name in ("SingletonLock", "SingletonCookie", "SingletonSocket"):
@@ -272,6 +277,21 @@ class BaseScraper:
                             runtime: {}
                         };
                     }
+                } catch (e) {}
+
+                // Spoof WebGL Vendor & Renderer to hide llvmpipe/Mesa software rendering in Xvfb
+                try {
+                    const spoofVendor = (ctx) => {
+                        if (!ctx || !ctx.prototype) return;
+                        const origGetParam = ctx.prototype.getParameter;
+                        ctx.prototype.getParameter = function(param) {
+                            if (param === 37445) return 'Google Inc. (NVIDIA)';
+                            if (param === 37446) return 'ANGLE (NVIDIA, NVIDIA GeForce RTX 3060 Direct3D11 vs_5_0 ps_5_0, D3D11)';
+                            return origGetParam.apply(this, arguments);
+                        };
+                    };
+                    if (typeof WebGLRenderingContext !== 'undefined') spoofVendor(WebGLRenderingContext);
+                    if (typeof WebGL2RenderingContext !== 'undefined') spoofVendor(WebGL2RenderingContext);
                 } catch (e) {}
 
                 try {
