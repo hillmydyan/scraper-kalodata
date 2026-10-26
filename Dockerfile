@@ -4,8 +4,12 @@ FROM mcr.microsoft.com/playwright/python:v1.40.0-jammy
 
 WORKDIR /app
 
+ENV DEBIAN_FRONTEND=noninteractive
+ENV TZ=Asia/Jakarta
+
 # Install dependensi tambahan untuk Database & VNC Server
 RUN apt-get update && apt-get install -y --no-install-recommends \
+    tzdata \
     build-essential \
     libpq-dev \
     curl \
