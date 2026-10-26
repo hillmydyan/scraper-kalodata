@@ -182,3 +182,33 @@ class TestCreatorScraperRevenueThreshold:
         scraper_th = CreatorScraper(page, "TH")
         res_th = scraper_th.scrape_creators(max_creators=None, min_revenue=110000.0)
         assert res_th["total_creators"] == 2
+
+    def test_apply_filters_selects_7_days(self):
+        page = MagicMock()
+        scraper = CreatorScraper(page, "ID")
+
+        # Mock date button and 7 days popup button
+        dt_mock = MagicMock()
+        dt_mock.is_visible.return_value = True
+        btn_7_days = MagicMock()
+        btn_7_days.is_visible.return_value = True
+
+        def mock_locator(selector):
+            loc = MagicMock()
+            if "Tanggal" in selector or "Date" in selector:
+                loc.first = dt_mock
+            elif "ant-popover" in selector or "ant-dropdown" in selector or "7" in selector:
+                loc.first = btn_7_days
+                sub_loc = MagicMock()
+                sub_loc.first = btn_7_days
+                loc.locator.return_value = sub_loc
+            else:
+                loc.first = MagicMock(is_visible=lambda timeout=0: False)
+            return loc
+
+        page.locator.side_effect = mock_locator
+        scraper.apply_filters()
+
+        dt_mock.click.assert_called_with(force=True)
+        btn_7_days.click.assert_called_with(force=True)
+

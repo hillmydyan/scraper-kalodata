@@ -2,7 +2,7 @@
 Creator Scraper for Kalodata.
 Scrapes creators and their top 3 best-selling products from https://www.kalodata.com/creator.
 Filters:
-- Tanggal: Kemarin
+- Tanggal: 7 hari terakhir
 - Kategori: Bawahan Wanita
 - Sumber Pendapatan: Video
 - Tipe Akun: Mandiri
@@ -52,7 +52,7 @@ class CreatorScraper:
     def apply_filters(self) -> bool:
         """
         Applies:
-        1. Tanggal: Kemarin
+        1. Tanggal: 7 hari terakhir
         2. Kategori: Bawahan Wanita
         3. Sumber Pendapatan: Video
         4. Tipe Akun: Mandiri
@@ -61,15 +61,23 @@ class CreatorScraper:
         logger.info("Applying creator filters", country=self.country_code)
         self.dismiss_overlays()
 
-        # 1. Date: Kemarin
+        # 1. Date: 7 hari terakhir
         try:
-            logger.info("Setting Date: Kemarin")
-            dt = self.page.locator("div.cursor-pointer:has-text('Tanggal')").first
-            dt.click(force=True)
+            logger.info("Setting Date: 7 hari terakhir")
+            dt = self.page.locator("div.cursor-pointer:has-text('Tanggal'), div.cursor-pointer:has-text('Date'), .ant-dropdown-trigger:has-text('Tanggal')").first
+            if dt.is_visible(timeout=2000):
+                dt.click(force=True)
+            else:
+                self.page.locator("text=/^Tanggal$|^Date$/i").first.click(force=True)
             self.page.wait_for_timeout(800)
-            kemarin_btn = self.page.locator(".ant-popover:not(.ant-popover-hidden)").locator("text=/Yesterday|^Kemarin/i").first
-            if kemarin_btn.is_visible(timeout=2000):
-                kemarin_btn.click(force=True)
+
+            btn_7_days = self.page.locator(".ant-popover:not(.ant-popover-hidden), .ant-dropdown:not(.ant-dropdown-hidden), div[role='tooltip']").locator("text=/7\\s*hari\\s*terakhir|Last\\s*7\\s*days|Past\\s*7\\s*days/i").first
+            if btn_7_days.is_visible(timeout=2000):
+                btn_7_days.click(force=True)
+            else:
+                alt_btn = self.page.locator("text=/7\\s*hari\\s*terakhir|Last\\s*7\\s*days|Past\\s*7\\s*days/i").first
+                if alt_btn.is_visible(timeout=1500):
+                    alt_btn.click(force=True)
             self.page.wait_for_timeout(800)
         except Exception as ex:
             logger.warning("Error applying date filter for creator", error=str(ex))
