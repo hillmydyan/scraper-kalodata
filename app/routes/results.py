@@ -127,8 +127,18 @@ def preview(job_id: str):
         if not job:
             abort(404)
 
+        # Allow customizable preview limit (default 200, 'all' for unlimited)
+        raw_limit = request.args.get("limit", "200")
+        if raw_limit.lower() == "all":
+            query_limit = None
+        else:
+            try:
+                query_limit = max(1, int(raw_limit))
+            except ValueError:
+                query_limit = 200
+
         if job.module == "creator":
-            results = db.execute(
+            stmt = (
                 select(KalodataCreatorProductResult)
                 .filter_by(scrape_job_id=job_id)
                 .order_by(
@@ -137,20 +147,25 @@ def preview(job_id: str):
                     KalodataCreatorProductResult.product_rank.asc().nullslast(),
                     KalodataCreatorProductResult.revenue_value.desc().nullslast()
                 )
-                .limit(100)
-            ).scalars().all()
+            )
+            if query_limit is not None:
+                stmt = stmt.limit(query_limit)
+            results = db.execute(stmt).scalars().all()
         else:
-            results = db.execute(
+            stmt = (
                 select(KalodataProductResult)
                 .filter_by(scrape_job_id=job_id)
                 .order_by(KalodataProductResult.revenue_value.desc().nullslast())
-                .limit(50)
-            ).scalars().all()
+            )
+            if query_limit is not None:
+                stmt = stmt.limit(query_limit)
+            results = db.execute(stmt).scalars().all()
 
         return render_template(
             "results/preview.html",
             job=job,
             results=results,
+            preview_limit=query_limit,
             format_wib=format_wib
         )
     finally:

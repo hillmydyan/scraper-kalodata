@@ -171,6 +171,7 @@ class CreatorScraper:
         total_creators_scanned = 0
         stop_scraping = False
         consecutive_below_min = 0
+        page_number = 1
 
         # Try to expand page size to 50 if available
         try:
@@ -476,11 +477,13 @@ class CreatorScraper:
                     break
 
                 try:
+                    self.dismiss_overlays()
                     next_selectors = [
-                        "nav button[aria-label*='berikutnya' i]",
-                        "nav button[aria-label*='next' i]",
+                        f"button[data-slot='pagination-link']:text-is('{page_number + 1}')",
                         "button[data-slot='pagination-link'][aria-label*='berikutnya' i]",
                         "button[data-slot='pagination-link'][aria-label*='next' i]",
+                        "nav button[aria-label*='berikutnya' i]",
+                        "nav button[aria-label*='next' i]",
                         "nav ul li:last-child button",
                         "button[aria-label='Go to next page']",
                         "button.btn-next",
@@ -490,20 +493,28 @@ class CreatorScraper:
                     clicked_next = False
                     for n_sel in next_selectors:
                         btn = self.page.locator(n_sel).first
-                        if btn.is_visible(timeout=1000) and btn.is_enabled():
+                        if btn.is_visible(timeout=1000):
+                            if btn.is_disabled():
+                                continue
                             aria_dis = btn.get_attribute("aria-disabled")
                             data_dis = btn.get_attribute("data-disabled")
-                            cls_str = btn.get_attribute("class") or ""
-                            if aria_dis == "true" or data_dis == "true" or "disabled" in cls_str:
+                            if aria_dis == "true" or data_dis == "true":
                                 continue
+                            cls_tokens = set((btn.get_attribute("class") or "").split())
+                            # Guard against Tailwind 'disabled:...' classes; only skip if actually disabled
+                            if "pointer-events-none" in cls_tokens or "opacity-50" in cls_tokens or "disabled" in cls_tokens or "is-disabled" in cls_tokens:
+                                continue
+                            self.dismiss_overlays()
                             btn.click(force=True)
                             clicked_next = True
                             self.page.wait_for_timeout(2500)
                             BaseScraper.pacing_page_delay()
+                            self.dismiss_overlays()
+                            page_number += 1
                             break
 
                     if not clicked_next:
-                        logger.info("No next page button found or disabled. Reached end of creator list.", total_scanned=total_creators_scanned)
+                        logger.info("No next page button found or disabled. Reached end of creator list.", total_scanned=total_creators_scanned, current_page=page_number)
                         break
                 except Exception as p_ex:
                     logger.warning("Pagination error", error=str(p_ex))
