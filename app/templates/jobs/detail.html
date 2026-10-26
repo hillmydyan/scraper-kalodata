@@ -220,6 +220,8 @@
     {% endfor %}
   </div>
 </div>
+{% endif %}
+
 {% if job.status in ['RUNNING', 'PENDING', 'BLOCKED'] %}
 <script>
   setTimeout(function() {

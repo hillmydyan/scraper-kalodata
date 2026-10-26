@@ -108,6 +108,38 @@ class TestDashboardRoutes(unittest.TestCase):
         resp = self.client.get("/accounts")
         self.assertEqual(resp.status_code, 403)
 
+    def test_job_detail_page(self):
+        # Login as admin
+        self.client.post("/login", data={"username": "test_admin", "password": "admin123"}, follow_redirects=True)
+
+        db = SessionLocal()
+        try:
+            from app.models.entities import ScrapeRun, ScrapeJob
+            from datetime import date
+            today = date.today()
+            run = ScrapeRun(trigger="manual", period_start=today, period_end=today, status="SUCCESS")
+            db.add(run)
+            db.flush()
+            job = ScrapeJob(
+                run_id=run.id,
+                country_code="ID",
+                module="creator",
+                period_start=today,
+                period_end=today,
+                status="SUCCESS",
+                stage="COMPLETED"
+            )
+            db.add(job)
+            db.commit()
+            job_id = job.id
+        finally:
+            db.close()
+
+        resp = self.client.get(f"/jobs/{job_id}")
+        self.assertEqual(resp.status_code, 200)
+        self.assertIn("Detail Job: ID", resp.get_data(as_text=True))
+
 
 if __name__ == "__main__":
     unittest.main()
+
