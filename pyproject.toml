@@ -2,7 +2,7 @@
 name = "kalodata-scraper-dashboard"
 version = "0.1.0"
 description = "Kalodata Web Scraper and Dashboard for Kurma Group"
-requires-python = ">=3.11"
+requires-python = ">=3.10"
 dependencies = [
     "flask>=3.0.0",
     "flask-login>=0.6.3",
