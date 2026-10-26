@@ -36,6 +36,7 @@ services:
   kalodata-web:
     build: .
     container_name: kalodata-web
+    hostname: kalodata-web
     restart: unless-stopped
     command: /app/deploy/docker-entrypoint-web.sh
     ports:
@@ -61,6 +62,7 @@ services:
   kalodata-worker:
     build: .
     container_name: kalodata-worker
+    hostname: kalodata-worker
     restart: unless-stopped
     command: /app/deploy/docker-entrypoint-worker.sh
     ports:

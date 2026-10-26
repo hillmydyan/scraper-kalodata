@@ -140,9 +140,15 @@ class BaseScraper:
         try:
             import redis
             r = redis.Redis.from_url(settings.REDIS_URL, socket_timeout=2)
-            r.delete(f"lock:profile:{profile_label}")
-        except Exception:
-            pass
+        # Clean Chrome Singleton locks across runtime profiles
+        for base_p in [settings.RUNTIME_DIR / "chrome_profile", settings.RUNTIME_DIR / "profiles" / "kalodata" / profile_label]:
+            for lock_name in ("SingletonLock", "SingletonCookie", "SingletonSocket"):
+                sf = base_p / lock_name
+                try:
+                    if sf.is_symlink() or sf.exists():
+                        sf.unlink(missing_ok=True)
+                except Exception:
+                    pass
 
     def launch_browser(self, headless: Optional[bool] = None, slow_mo: int = 100, channel: Optional[str] = None):
         """
@@ -210,6 +216,15 @@ class BaseScraper:
         }
         if channel:
             kwargs["channel"] = channel
+
+        # Clean stale Chrome Singleton locks from previous container crashes/restarts
+        for lock_name in ("SingletonLock", "SingletonCookie", "SingletonSocket"):
+            singleton_file = self.profile_dir / lock_name
+            try:
+                if singleton_file.is_symlink() or singleton_file.exists():
+                    singleton_file.unlink(missing_ok=True)
+            except Exception:
+                pass
 
         try:
             self.browser_context = self.playwright.chromium.launch_persistent_context(**kwargs)
