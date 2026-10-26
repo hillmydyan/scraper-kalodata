@@ -24,8 +24,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY pyproject.toml .
 RUN pip install --no-cache-dir .
 
-# Verifikasi browser Playwright Chromium
+# Verifikasi browser Playwright Chromium & Google Chrome resmi
 RUN playwright install chromium
+RUN playwright install --with-deps chrome || true
 
 # Copy application files and deploy scripts
 COPY app/ ./app/

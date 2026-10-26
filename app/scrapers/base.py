@@ -161,7 +161,7 @@ class BaseScraper:
             elif sys.platform == "win32":
                 channel = "chrome"
             else:
-                channel = None
+                channel = "chrome"
 
         env = os.environ.copy()
         if headless:
@@ -177,6 +177,9 @@ class BaseScraper:
             "--disable-setuid-sandbox",
             "--disable-dev-shm-usage",
             "--disable-blink-features=AutomationControlled",
+            "--disable-infobars",
+            "--no-first-run",
+            "--no-default-browser-check",
         ]
         if headless:
             args.extend([
@@ -220,20 +223,52 @@ class BaseScraper:
             else:
                 raise ex
 
-        # Stealth init script to mask automation & navigator.webdriver
+        # Stealth init script: ensure webdriver is clean and realistic browser properties exist
         try:
             self.browser_context.add_init_script("""
-                Object.defineProperty(navigator, 'webdriver', {
-                    get: () => undefined
-                });
-                window.chrome = {
-                    runtime: {}
-                };
+                try {
+                    if (navigator.hasOwnProperty('webdriver')) {
+                        delete navigator.webdriver;
+                    }
+                    const proto = Object.getPrototypeOf(navigator);
+                    if (proto && 'webdriver' in proto) {
+                        Object.defineProperty(proto, 'webdriver', {
+                            get: () => false,
+                            configurable: true,
+                            enumerable: true
+                        });
+                    }
+                } catch (e) {}
+
+                try {
+                    if (!window.chrome) {
+                        window.chrome = {
+                            app: {
+                                isInstalled: false,
+                                InstallState: { DISABLED: 'disabled', INSTALLED: 'installed', NOT_INSTALLED: 'not_installed' },
+                                RunningState: { CANNOT_RUN: 'cannot_run', READY_TO_RUN: 'ready_to_run', RUNNING: 'running' }
+                            },
+                            csi: function() {},
+                            loadTimes: function() {},
+                            runtime: {}
+                        };
+                    }
+                } catch (e) {}
+
+                try {
+                    if (navigator.plugins && navigator.plugins.length === 0) {
+                        Object.defineProperty(navigator, 'plugins', {
+                            get: () => [1, 2, 3, 4, 5],
+                            enumerable: true,
+                            configurable: true
+                        });
+                    }
+                } catch (e) {}
             """)
         except Exception:
             pass
 
-        # Auto-import portable session cookies if kalodata_session.json exists
+        # Auto-import portable session cookies & localStorage if kalodata_session.json exists
         session_file = settings.RUNTIME_DIR / "kalodata_session.json"
         if session_file.exists():
             try:
@@ -243,8 +278,31 @@ class BaseScraper:
                     cookies = state_data.get("cookies", [])
                     if cookies:
                         self.browser_context.add_cookies(cookies)
+
+                    # Pre-load localStorage for Kalodata origin
+                    origins = state_data.get("origins", [])
+                    for orig in origins:
+                        origin_url = orig.get("origin", "")
+                        storage_items = orig.get("localStorage", [])
+                        if "kalodata.com" in origin_url and storage_items:
+                            storage_js = ",\n".join(
+                                f"{json.dumps(it['name'])}: {json.dumps(it['value'])}"
+                                for it in storage_items
+                            )
+                            self.browser_context.add_init_script(f"""
+                                try {{
+                                    if (location.origin.includes('kalodata.com')) {{
+                                        const stored = {{{storage_js}}};
+                                        for (const [k, v] of Object.entries(stored)) {{
+                                            if (!localStorage.getItem(k)) {{
+                                                localStorage.setItem(k, v);
+                                            }}
+                                        }}
+                                    }}
+                                }} catch (e) {{}}
+                            """)
             except Exception as e:
-                logger.debug("Auto cookie restore skipped or failed", error=str(e))
+                logger.debug("Auto session restore skipped or failed", error=str(e))
 
         return self.browser_context
 

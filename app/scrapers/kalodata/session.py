@@ -259,9 +259,9 @@ class SessionManager:
         try:
             context = scraper.launch_browser(headless=False)
             page = context.new_page()
-            login_url = f"{settings.KALODATA_BASE_URL.rstrip('/')}/login"
-            logger.info("Opening manual login browser on VNC DISPLAY", url=login_url, profile=profile_label)
-            page.goto(login_url, wait_until="domcontentloaded")
+            target_url = f"{settings.KALODATA_BASE_URL.rstrip('/')}/product"
+            logger.info("Opening manual login browser on VNC DISPLAY", url=target_url, profile=profile_label)
+            page.goto(target_url, wait_until="domcontentloaded")
 
             # Fallback credentials if not provided
             if not email or not password:
