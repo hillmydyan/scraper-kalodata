@@ -15,7 +15,7 @@ from sqlalchemy.orm import Session
 
 from app.models.entities import (
     ScrapeRun, ScrapeJob, Product, KalodataProductResult, KalodataCreatorProductResult,
-    ScrapeJobRowsRejected, AccountProfile, AuditLog
+    ScrapeJobRowsRejected, AccountProfile, AuditLog, Setting
 )
 from app.config import settings
 
@@ -24,13 +24,25 @@ logger = structlog.get_logger(__name__)
 
 class JobService:
     @staticmethod
+    def get_min_product_sales(db: Session) -> int:
+        """Returns the configured minimum product sales (default: settings.MIN_PRODUCT_SALES or 150)."""
+        try:
+            st = db.get(Setting, "min_product_sales")
+            if st and st.value is not None:
+                return int(st.value)
+        except Exception:
+            pass
+        return getattr(settings, "MIN_PRODUCT_SALES", 150)
+
+    @staticmethod
     def create_daily_run(
         db: Session,
         period_date: Optional[date] = None,
         trigger: str = "scheduled",
         created_by: Optional[str] = "system",
         countries: Optional[List[str]] = None,
-        module: str = "product"
+        module: str = "product",
+        min_sales: Optional[int] = None
     ) -> ScrapeRun:
         """Creates a ScrapeRun and child ScrapeJob records for specified countries or ID, MY, TH."""
         if period_date is None:
@@ -38,6 +50,7 @@ class JobService:
             period_date = date.today() - timedelta(days=1)
 
         target_countries = countries if countries else ["ID", "MY", "TH"]
+        effective_min_sales = min_sales if min_sales is not None else JobService.get_min_product_sales(db)
 
         run = ScrapeRun(
             id=str(uuid.uuid4()),
@@ -47,7 +60,7 @@ class JobService:
             status="RUNNING",
             started_at=datetime.now(timezone.utc),
             created_by=created_by,
-            summary={"countries": target_countries, "module": module}
+            summary={"countries": target_countries, "module": module, "min_sales": effective_min_sales}
         )
         db.add(run)
 
@@ -485,7 +498,13 @@ class JobService:
 
                     is_manual = (job.run.trigger == "manual") if job.run else False
                     effective_max = limit if (is_manual and limit and limit > 0) else None
-                    min_sales = getattr(settings, "MIN_PRODUCT_SALES", 150)
+                    if job.run and isinstance(job.run.summary, dict) and job.run.summary.get("min_sales") is not None:
+                        try:
+                            min_sales = int(job.run.summary["min_sales"])
+                        except (ValueError, TypeError):
+                            min_sales = cls.get_min_product_sales(db)
+                    else:
+                        min_sales = cls.get_min_product_sales(db)
                     scrape_res = list_scraper.scrape_products(
                         max_limit=effective_max,
                         min_sales=min_sales,

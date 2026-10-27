@@ -58,10 +58,33 @@
 
   <!-- Card 2: Batas & Parameter Scraper -->
   <div class="card-kurma">
-    <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 1.25rem; border-bottom: 1px solid var(--color-border-subtle); padding-bottom: 0.75rem;">
-      {{ icon('server', 20, color='var(--color-primary)') }}
-      <h2 class="card-title" style="margin: 0;">Batas &amp; Parameter Scraper</h2>
+    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.25rem; border-bottom: 1px solid var(--color-border-subtle); padding-bottom: 0.75rem;">
+      <div style="display: flex; align-items: center; gap: 0.5rem;">
+        {{ icon('server', 20, color='var(--color-primary)') }}
+        <h2 class="card-title" style="margin: 0;">Batas &amp; Parameter Scraper</h2>
+      </div>
+      <span class="badge" style="background: rgba(37, 99, 235, 0.1); color: var(--color-primary); font-weight: 700; font-size: 0.75rem; padding: 0.2rem 0.5rem; border-radius: 4px;">Min. Penjualan: &gt; {{ settings.min_product_sales }} Pcs</span>
     </div>
+
+    <!-- Form Ubah Batas Penjualan Produk -->
+    <form method="POST" action="{{ url_for('settings.update_min_sales') }}" style="margin-bottom: 1rem; background: #F8FAFC; border: 1px solid var(--color-border-subtle); border-radius: 8px; padding: 0.75rem;">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+      <label style="display: block; font-size: 0.8rem; font-weight: 700; color: var(--color-sidebar); margin-bottom: 0.35rem;">
+        Minimal Penjualan Produk (Filter Katalog):
+      </label>
+      <div style="display: flex; gap: 0.5rem; align-items: center;">
+        <input type="number" name="min_product_sales" value="{{ settings.min_product_sales }}" min="1" max="100000" required
+               class="form-control" style="width: 100px; padding: 0.4rem 0.6rem; font-size: 0.88rem; font-weight: 700; text-align: center;">
+        <span style="font-size: 0.85rem; color: var(--color-text-muted);">Pcs Terjual</span>
+        <button type="submit" class="btn btn-primary" style="margin-left: auto; padding: 0.4rem 0.85rem; font-size: 0.8rem; display: flex; align-items: center; gap: 0.3rem;">
+          {{ icon('check', 14, stroke=2.5) }} Simpan
+        </button>
+      </div>
+      <span style="display: block; font-size: 0.75rem; color: var(--color-text-muted); margin-top: 0.3rem;">
+        Hanya produk dengan penjualan di atas angka ini yang akan ditarik dan diekspor.
+      </span>
+    </form>
+
     <div style="font-size: 0.88rem; line-height: 2.1; color: var(--color-text);">
       <div style="display: flex; justify-content: space-between;">
         <span style="color: var(--color-text-muted);">Maks Entitas / Negara:</span>

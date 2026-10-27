@@ -68,12 +68,14 @@ def index():
                 "headless": "true"
             }
 
+        min_product_sales = JobService.get_min_product_sales(db)
         return render_template(
             "jobs/index.html",
             jobs=jobs,
             default_period=today_str,
             schedule_config=schedule_config,
             manual_config=manual_config,
+            min_product_sales=min_product_sales,
             format_wib=format_wib
         )
     finally:
@@ -177,6 +179,12 @@ def trigger_manual():
 
     db = SessionLocal()
     try:
+        min_sales_str = request.form.get("min_sales")
+        try:
+            min_sales = int(min_sales_str) if min_sales_str else JobService.get_min_product_sales(db)
+        except (ValueError, TypeError):
+            min_sales = JobService.get_min_product_sales(db)
+
         # Persist the user's manual configuration so it never reverts to 20
         from sqlalchemy.orm.attributes import flag_modified
         manual_data = {
@@ -184,7 +192,8 @@ def trigger_manual():
             "module": module,
             "country": country,
             "headless": headless_str,
-            "period": period_str
+            "period": period_str,
+            "min_sales": min_sales
         }
         manual_setting = db.get(Setting, "manual_config")
         if not manual_setting:
@@ -203,7 +212,8 @@ def trigger_manual():
             trigger="manual",
             created_by=current_user.username,
             countries=target_countries,
-            module=module
+            module=module,
+            min_sales=min_sales
         )
 
         # Dispatch background execution immediately

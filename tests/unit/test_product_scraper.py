@@ -66,3 +66,44 @@ class TestProductListScraperSalesThreshold:
         })
         assert valid is True
         assert reason == ""
+
+    def test_validate_row_with_custom_min_sales(self):
+        page = MagicMock()
+        scraper = ProductListScraper(page, "ID")
+
+        # Custom threshold 50: 60 passes, 40 fails
+        valid, _ = scraper._validate_row({
+            "source_product_id": "123",
+            "product_name": "Test Item",
+            "sales_value": 60
+        }, min_sales=50)
+        assert valid is True
+
+        valid, reason = scraper._validate_row({
+            "source_product_id": "123",
+            "product_name": "Test Item",
+            "sales_value": 40
+        }, min_sales=50)
+        assert valid is False
+        assert reason == "SALES_BELOW_MIN_50"
+
+
+class TestJobServiceMinProductSales:
+    def test_get_min_product_sales_default(self):
+        from app.services.job_service import JobService
+        db = MagicMock()
+        db.get.return_value = None
+        assert JobService.get_min_product_sales(db) == 150
+
+    def test_get_min_product_sales_from_db(self):
+        from app.services.job_service import JobService
+        from app.models.entities import Setting
+        db = MagicMock()
+        db.get.return_value = Setting(key="min_product_sales", value=80)
+        assert JobService.get_min_product_sales(db) == 80
+
+    def test_create_daily_run_persists_custom_min_sales(self):
+        from app.services.job_service import JobService
+        db = MagicMock()
+        run = JobService.create_daily_run(db, trigger="manual", min_sales=75)
+        assert run.summary["min_sales"] == 75
