@@ -158,3 +158,25 @@ sudo systemctl reload nginx
 sudo apt-get install -y certbot python3-certbot-nginx
 sudo certbot --nginx -d kalodata.perusahaan.com
 ```
+
+---
+
+## 8. Cara Update Kode Terbaru di VPS (Penting!)
+
+Setiap kali ada perbaikan atau update kode dari repository, jalankan script update 1-langkah di terminal VPS:
+
+```bash
+cd /opt/kalodata
+sudo bash deploy/update_vps.sh
+```
+
+Atau secara manual:
+```bash
+cd /opt/kalodata
+git pull origin main
+sudo systemctl daemon-reload
+sudo systemctl restart kalodata-worker kalodata-web kalodata-beat
+```
+
+> **Catatan Penting:** Background worker (`kalodata-worker`) memuat file Python ke memori saat service berjalan. Menjalankan `sudo systemctl restart kalodata-worker` (atau via `update_vps.sh`) **wajib dilakukan** setelah `git pull` agar worker langsung menggunakan logika dan batas scraping terbaru!
+

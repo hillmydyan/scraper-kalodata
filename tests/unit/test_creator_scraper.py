@@ -281,3 +281,54 @@ class TestCreatorScraperRevenueThreshold:
         dt_mock.click.assert_called_with(force=True)
         btn_kemarin.click.assert_called_with(force=True)
 
+    def test_creator_revenue_filter_stops_at_exact_boundary(self):
+        """
+        Tests the exact boundary from Kalodata:
+        - Row 147: Rp50,10JT (>= 50M) -> scraped
+        - Row 148: Rp50,09JT (>= 50M) -> scraped
+        - Row 149: Rp49,98JT (< 50M)  -> MUST STOP IMMEDIATELY!
+        - Row 150: Rp49,44JT (< 50M)  -> MUST NEVER BE REACHED!
+        """
+        page = MagicMock()
+        context = MagicMock()
+        page.context = context
+        prod_tab = MagicMock()
+        context.new_page.return_value = prod_tab
+
+        def make_mock_row(rank_str, name_str, rev_str):
+            row = MagicMock()
+            row.scroll_into_view_if_needed = MagicMock()
+            row.evaluate = MagicMock(return_value=[rank_str, name_str, rev_str])
+            td0 = MagicMock()
+            td0.inner_text.return_value = rank_str
+            td1 = MagicMock()
+            td1.inner_text.return_value = name_str
+            td1.locator.return_value.first = MagicMock(count=lambda: 0)
+            td2 = MagicMock()
+            td2.inner_text.return_value = rev_str
+            row.locator.return_value.all.return_value = [td0, td1, td2]
+            return row
+
+        r147 = make_mock_row("147", "@nthniaira nathania manurung", "Rp50,10JT")
+        r148 = make_mock_row("148", "@reviewoversize Yellow | by me", "Rp50,09JT")
+        r149 = make_mock_row("149", "@putriiiiazaaaaaa RacunByWans", "Rp49,98JT")
+        r150 = make_mock_row("150", "@racunoutfitmurah273 racun tiktokshop", "Rp49,44JT")
+
+        page.locator.return_value.all.return_value = [r147, r148, r149, r150]
+
+        detail_tab = MagicMock()
+        detail_tab.is_closed.return_value = False
+        detail_tab.evaluate.return_value = [
+            {"index": 1, "rowKey": "p1", "name": "Prod 1", "revenue": "Rp 1JT", "sales": "100"}
+        ]
+        context.expect_page.return_value.__enter__.return_value = MagicMock(value=detail_tab)
+
+        scraper = CreatorScraper(page, "ID")
+        res = scraper.scrape_creators(max_creators=None, min_revenue=50000000.0)
+
+        # Only row 147 and 148 must be scanned! Row 149 triggers stopping, so total is 2.
+        assert res["total_creators"] == 2
+        assert len(res["items"]) == 2
+        assert res["items"][0]["creator_name"] == "@nthniaira nathania manurung"
+        assert res["items"][1]["creator_name"] == "@reviewoversize Yellow | by me"
+

@@ -238,13 +238,48 @@ class CreatorScraper:
                         stop_scraping = True
                         break
 
+                    # Ensure row is in viewport for Chromium layout and rendering
+                    try:
+                        row.scroll_into_view_if_needed(timeout=1000)
+                    except Exception:
+                        pass
+
+                    # Extract all cell texts directly via evaluate for speed and DOM accuracy
+                    row_cells_data: List[str] = []
+                    try:
+                        eval_cells = row.evaluate("""(r) => {
+                            const tds = Array.from(r.querySelectorAll('td'));
+                            return tds.map(td => (td.innerText || td.textContent || '').trim());
+                        }""")
+                        if eval_cells and isinstance(eval_cells, list):
+                            row_cells_data = [str(c).strip() for c in eval_cells]
+                    except Exception:
+                        pass
+
                     tds = row.locator("td").all()
-                    if len(tds) < 3:
+                    if not row_cells_data:
+                        row_cells_data = [t.inner_text().strip() for t in tds]
+
+                    if len(row_cells_data) < 2 and len(tds) < 2:
                         continue
 
-                    # Extract creator revenue from td[2] (e.g. 'Rp19,01M', 'Rp4,5JT', 'Rp3,8JT')
-                    creator_rev_raw = tds[2].inner_text().strip()
+                    # Extract creator revenue:
+                    # Primary check is column 2 (Pendapatan / Revenue)
+                    creator_rev_raw = row_cells_data[2] if len(row_cells_data) > 2 else (tds[2].inner_text().strip() if len(tds) > 2 else "")
+
+                    # Fallback scan across all cells in the row if cell 2 is empty or doesn't have currency symbol
+                    currency_pattern = re.compile(r"(?:Rp|RM|฿|\$)\s*[\d\.,]+(?:\s*[a-zA-Z]+)?", re.IGNORECASE)
+                    if not currency_pattern.search(creator_rev_raw):
+                        for cell_txt in row_cells_data:
+                            if currency_pattern.search(cell_txt):
+                                creator_rev_raw = cell_txt
+                                break
+
                     creator_rev_val, _ = NumberParser.parse_currency_amount(creator_rev_raw, self.country_code)
+
+                    # Explicitly treat dash, 0, or zero values as 0.0
+                    if creator_rev_raw in ["-", "0", "Rp0", "RM0", "฿0"] or (creator_rev_val is not None and creator_rev_val == 0.0):
+                        creator_rev_val = 0.0
 
                     # Threshold check (min_revenue, default 50,000,000 IDR / 14,000 MYR / 110,000 THB)
                     if min_revenue and creator_rev_val is not None:
@@ -262,7 +297,8 @@ class CreatorScraper:
                                 revenue=creator_rev_val,
                                 raw_revenue=creator_rev_raw,
                                 threshold=effective_min,
-                                country=self.country_code
+                                country=self.country_code,
+                                scanned_so_far=total_creators_scanned
                             )
                             stop_scraping = True
                             break
@@ -274,7 +310,7 @@ class CreatorScraper:
                         )
 
                     # Extract creator name
-                    creator_name_raw = tds[1].inner_text().strip()
+                    creator_name_raw = row_cells_data[1] if len(row_cells_data) > 1 else (tds[1].inner_text().strip() if len(tds) > 1 else "")
                     creator_name = " ".join(creator_name_raw.split())
                     creator_log_name = creator_name.encode("ascii", "ignore").decode()
 
