@@ -12,7 +12,7 @@ import re
 import sys
 import time
 from datetime import date, timedelta
-from typing import List, Dict, Any, Optional, Callable, Tuple
+from typing import List, Dict, Any, Optional, Callable, Tuple, Set
 import structlog
 from playwright.sync_api import Page
 
@@ -185,6 +185,7 @@ class CreatorScraper:
         stop_scraping = False
         consecutive_below_min = 0
         page_number = 1
+        seen_creator_keys: Set[str] = set()
 
         # Try to expand page size to 50 if available
         try:
@@ -284,12 +285,30 @@ class CreatorScraper:
                     # Threshold check (min_revenue, default 50,000,000 IDR / 14,000 MYR / 110,000 THB)
                     if min_revenue and creator_rev_val is not None:
                         effective_min = min_revenue
-                        is_myr = "RM" in creator_rev_raw.upper() or (self.country_code == "MY" and "RP" not in creator_rev_raw.upper())
-                        is_thb = "THB" in creator_rev_raw.upper() or "฿" in creator_rev_raw or (self.country_code == "TH" and "RP" not in creator_rev_raw.upper())
-                        if is_myr and effective_min >= 1_000_000:
-                            effective_min = getattr(settings, "MIN_CREATOR_REVENUE_MYR", 14000.0)
-                        elif is_thb and effective_min >= 1_000_000:
-                            effective_min = getattr(settings, "MIN_CREATOR_REVENUE_THB", 110000.0)
+                        is_idr = "RP" in creator_rev_raw.upper() or "IDR" in creator_rev_raw.upper()
+                        is_myr = "RM" in creator_rev_raw.upper() or "MYR" in creator_rev_raw.upper()
+                        is_thb = "THB" in creator_rev_raw.upper() or "฿" in creator_rev_raw
+
+                        if is_idr:
+                            # If table displays currency in IDR (Rp), ensure threshold is scaled to IDR (50M)
+                            if effective_min < 1_000_000:
+                                effective_min = getattr(settings, "MIN_CREATOR_REVENUE_IDR", 50000000.0)
+                        elif is_myr:
+                            # If table displays currency in MYR (RM), ensure threshold is scaled to MYR (14K)
+                            if effective_min >= 1_000_000:
+                                effective_min = getattr(settings, "MIN_CREATOR_REVENUE_MYR", 14000.0)
+                        elif is_thb:
+                            # If table displays currency in THB (฿), ensure threshold is scaled to THB (110K)
+                            if effective_min >= 1_000_000:
+                                effective_min = getattr(settings, "MIN_CREATOR_REVENUE_THB", 110000.0)
+                        else:
+                            # Fallback based on scraper country_code if currency symbol not in cell
+                            if self.country_code == "MY" and effective_min >= 1_000_000:
+                                effective_min = getattr(settings, "MIN_CREATOR_REVENUE_MYR", 14000.0)
+                            elif self.country_code == "TH" and effective_min >= 1_000_000:
+                                effective_min = getattr(settings, "MIN_CREATOR_REVENUE_THB", 110000.0)
+                            elif self.country_code == "ID" and effective_min < 1_000_000:
+                                effective_min = getattr(settings, "MIN_CREATOR_REVENUE_IDR", 50000000.0)
 
                         if creator_rev_val < effective_min:
                             logger.info(
@@ -330,6 +349,14 @@ class CreatorScraper:
                             id_m = re.search(r"id=(\d+)", c_href)
                             if id_m:
                                 creator_id = id_m.group(1)
+
+                    # Deduplication guard: avoid reprocessing creator if DOM wasn't updated on pagination
+                    creator_key = creator_id or creator_name
+                    if creator_key:
+                        if creator_key in seen_creator_keys:
+                            logger.info("Skipping already processed creator", creator=creator_log_name, creator_id=creator_id)
+                            continue
+                        seen_creator_keys.add(creator_key)
 
                     total_creators_scanned += 1
                     logger.info("Opening creator details via click", creator=creator_log_name, creator_id=creator_id, revenue=creator_rev_raw)
@@ -531,16 +558,30 @@ class CreatorScraper:
 
                 try:
                     self.dismiss_overlays()
+                    # Capture current first row text to detect when table advances to the next page
+                    old_first_row_text = ""
+                    try:
+                        first_tr = self.page.locator("tbody tr.group, tbody tr").first
+                        if first_tr.is_visible(timeout=500):
+                            old_first_row_text = (first_tr.inner_text() or "").strip()
+                    except Exception:
+                        pass
+
                     next_selectors = [
                         f"button[data-slot='pagination-link']:text-is('{page_number + 1}')",
+                        f"li:not(.is-disabled) > button:text-is('{page_number + 1}')",
+                        f"ul.el-pager li.number:text-is('{page_number + 1}')",
+                        f"li.ant-pagination-item-{page_number + 1}",
                         "button[data-slot='pagination-link'][aria-label*='berikutnya' i]",
                         "button[data-slot='pagination-link'][aria-label*='next' i]",
+                        "button[data-slot='pagination-next']",
+                        "a[data-slot='pagination-next']",
+                        "button.btn-next",
+                        ".el-pagination .btn-next",
+                        "li.ant-pagination-next button",
                         "nav button[aria-label*='berikutnya' i]",
                         "nav button[aria-label*='next' i]",
-                        "nav ul li:last-child button",
                         "button[aria-label='Go to next page']",
-                        "button.btn-next",
-                        ".pagination-next",
                         "button:has-text('Next')"
                     ]
                     clicked_next = False
@@ -560,7 +601,25 @@ class CreatorScraper:
                             self.dismiss_overlays()
                             btn.click(force=True)
                             clicked_next = True
-                            self.page.wait_for_timeout(2500)
+
+                            # Wait for table content to actually update to the new page
+                            if old_first_row_text:
+                                try:
+                                    self.page.wait_for_function(
+                                        """(oldText) => {
+                                            const tr = document.querySelector('tbody tr.group, tbody tr');
+                                            if (!tr) return false;
+                                            const cur = (tr.innerText || tr.textContent || '').trim();
+                                            return cur.length > 0 && cur !== oldText;
+                                        }""",
+                                        arg=old_first_row_text,
+                                        timeout=10000
+                                    )
+                                except Exception:
+                                    self.page.wait_for_timeout(2500)
+                            else:
+                                self.page.wait_for_timeout(2500)
+
                             BaseScraper.pacing_page_delay()
                             self.dismiss_overlays()
                             page_number += 1
@@ -569,6 +628,17 @@ class CreatorScraper:
                     if not clicked_next:
                         logger.info("No next page button found or disabled. Reached end of creator list.", total_scanned=total_creators_scanned, current_page=page_number)
                         break
+
+                    # Check if the table DOM actually advanced or if it's stuck on the old page
+                    try:
+                        next_first_tr = self.page.locator("tbody tr.group, tbody tr").first
+                        if next_first_tr.is_visible(timeout=1000):
+                            next_first_text = (next_first_tr.inner_text() or "").strip()
+                            if old_first_row_text and next_first_text == old_first_row_text:
+                                logger.warning("Table rows did not change after pagination click, stopping to prevent duplicate scraping", page=page_number)
+                                break
+                    except Exception:
+                        pass
                 except Exception as p_ex:
                     logger.warning("Pagination error", error=str(p_ex))
                     break

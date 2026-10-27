@@ -332,3 +332,50 @@ class TestCreatorScraperRevenueThreshold:
         assert res["items"][0]["creator_name"] == "@nthniaira nathania manurung"
         assert res["items"][1]["creator_name"] == "@reviewoversize Yellow | by me"
 
+    def test_creator_revenue_scales_to_idr_threshold_when_my_table_displays_rp(self):
+        """When country is MY (min_revenue=14000 passed) but table displays Rp, threshold scales to 50M IDR."""
+        page = MagicMock()
+        context = MagicMock()
+        page.context = context
+        prod_tab = MagicMock()
+        context.new_page.return_value = prod_tab
+
+        def make_mock_row(rank_str, name_str, rev_str):
+            row = MagicMock()
+            row.scroll_into_view_if_needed = MagicMock()
+            row.evaluate = MagicMock(return_value=[rank_str, name_str, rev_str])
+            td0 = MagicMock()
+            td0.inner_text.return_value = rank_str
+            td1 = MagicMock()
+            td1.inner_text.return_value = name_str
+            td1.locator.return_value.first = MagicMock(count=lambda: 0)
+            td2 = MagicMock()
+            td2.inner_text.return_value = rev_str
+            row.locator.return_value.all.return_value = [td0, td1, td2]
+            return row
+
+        # Creators for MY in Rp
+        r1 = make_mock_row("1", "@sirrah.fashion", "Rp287,36JT")
+        r2 = make_mock_row("33", "@ayamguringgg_", "Rp52,51JT")
+        r3 = make_mock_row("34", "@asyzck", "Rp49,08JT")  # Below 50M -> should stop!
+        r4 = make_mock_row("35", "@orked2121", "Rp49,08JT")
+
+        page.locator.return_value.all.return_value = [r1, r2, r3, r4]
+
+        detail_tab = MagicMock()
+        detail_tab.is_closed.return_value = False
+        detail_tab.evaluate.return_value = [
+            {"index": 1, "rowKey": "p1", "name": "Prod 1", "revenue": "Rp 1JT", "sales": "100"}
+        ]
+        context.expect_page.return_value.__enter__.return_value = MagicMock(value=detail_tab)
+
+        scraper = CreatorScraper(page, "MY")
+        # Passes 14000.0 MYR from job_service, but table displays Rp -> must stop at r3 (< 50M IDR)
+        res = scraper.scrape_creators(max_creators=None, min_revenue=14000.0)
+
+        assert res["total_creators"] == 2
+        assert len(res["items"]) == 2
+        assert res["items"][0]["creator_name"] == "@sirrah.fashion"
+        assert res["items"][1]["creator_name"] == "@ayamguringgg_"
+
+
