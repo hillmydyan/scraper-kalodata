@@ -103,6 +103,12 @@
         </select>
         <div class="field-hint">Negara tujuan scraping harian di https://www.kalodata.com.</div>
       </div>
+
+      <div class="form-group">
+        <label class="form-label" for="schedule_min_sales">Minimal Penjualan Produk (Pcs)</label>
+        <input type="number" id="schedule_min_sales" name="min_product_sales" value="{{ min_product_sales }}" min="1" max="100000" class="form-input" style="font-weight: 700;" required>
+        <div class="field-hint">Hanya scrape produk jika penjualan &gt; angka ini (bisa Anda ubah kapan saja).</div>
+      </div>
     </div>
 
     <!-- Kriteria Scraping Banner -->

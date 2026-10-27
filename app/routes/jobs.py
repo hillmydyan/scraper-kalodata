@@ -130,6 +130,24 @@ def save_schedule():
 
         db.commit()
 
+        # Update min_product_sales if provided
+        min_sales_input = request.form.get("min_product_sales")
+        if min_sales_input:
+            try:
+                min_sales_val = max(1, int(min_sales_input))
+                st_sales = db.get(Setting, "min_product_sales")
+                if not st_sales:
+                    st_sales = Setting(key="min_product_sales", value=min_sales_val, updated_by=current_user.username)
+                    db.add(st_sales)
+                else:
+                    st_sales.value = min_sales_val
+                    st_sales.updated_by = current_user.username
+                    st_sales.updated_at = datetime.now(timezone.utc)
+                    flag_modified(st_sales, "value")
+                db.commit()
+            except (ValueError, TypeError):
+                pass
+
         # Ensure scheduler thread is running and reset trigger cache
         from app.services.scheduler_service import SchedulerService
         SchedulerService.start_scheduler_thread()

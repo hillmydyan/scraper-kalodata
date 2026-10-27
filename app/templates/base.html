@@ -78,6 +78,12 @@
             <span>Akun &amp; Sesi</span>
           </a>
         </li>
+        <li>
+          <a href="{{ url_for('settings.index') }}" class="menu-link {% if request.blueprint == 'settings' %}active{% endif %}">
+            {{ icon('settings', 19) }}
+            <span>Pengaturan</span>
+          </a>
+        </li>
         {% endif %}
       </ul>
 
