@@ -49,35 +49,40 @@ class CreatorScraper:
         except Exception:
             pass
 
-    def apply_filters(self) -> bool:
+    def apply_filters(self, date_preset: str = "kemarin") -> bool:
         """
         Applies:
-        1. Tanggal: 7 hari terakhir
+        1. Tanggal: Kemarin (or 7 hari terakhir if date_preset == '7_days')
         2. Kategori: Bawahan Wanita
         3. Sumber Pendapatan: Video
         4. Tipe Akun: Mandiri
         5. Submit / Kirim
         """
-        logger.info("Applying creator filters", country=self.country_code)
+        logger.info("Applying creator filters", country=self.country_code, date_preset=date_preset)
         self.dismiss_overlays()
 
-        # 1. Date: 7 hari terakhir
+        # 1. Date filter (default: Kemarin / Yesterday)
         try:
-            logger.info("Setting Date: 7 hari terakhir")
-            dt = self.page.locator("div.cursor-pointer:has-text('Tanggal'), div.cursor-pointer:has-text('Date'), .ant-dropdown-trigger:has-text('Tanggal')").first
+            logger.info("Setting Creator Date Filter", date_preset=date_preset)
+            dt = self.page.locator("div.cursor-pointer:has-text('Tanggal'), div.cursor-pointer:has-text('Date'), .ant-dropdown-trigger:has-text('Tanggal'), .ant-dropdown-trigger:has-text('Date')").first
             if dt.is_visible(timeout=2000):
                 dt.click(force=True)
             else:
                 self.page.locator("text=/^Tanggal$|^Date$/i").first.click(force=True)
             self.page.wait_for_timeout(800)
 
-            btn_7_days = self.page.locator(".ant-popover:not(.ant-popover-hidden), .ant-dropdown:not(.ant-dropdown-hidden), div[role='tooltip']").locator("text=/7\\s*hari\\s*terakhir|Last\\s*7\\s*days|Past\\s*7\\s*days/i").first
-            if btn_7_days.is_visible(timeout=2000):
-                btn_7_days.click(force=True)
+            if date_preset in ("7_days", "7_hari", "last_7_days"):
+                btn_date = self.page.locator(".ant-popover:not(.ant-popover-hidden), .ant-dropdown:not(.ant-dropdown-hidden), div[role='tooltip']").locator("text=/7\\s*hari\\s*terakhir|Last\\s*7\\s*days|Past\\s*7\\s*days/i").first
+                if not btn_date.is_visible(timeout=1500):
+                    btn_date = self.page.locator("text=/7\\s*hari\\s*terakhir|Last\\s*7\\s*days|Past\\s*7\\s*days/i").first
             else:
-                alt_btn = self.page.locator("text=/7\\s*hari\\s*terakhir|Last\\s*7\\s*days|Past\\s*7\\s*days/i").first
-                if alt_btn.is_visible(timeout=1500):
-                    alt_btn.click(force=True)
+                # Default: Kemarin / Yesterday (1 hari)
+                btn_date = self.page.locator(".ant-popover:not(.ant-popover-hidden), .ant-dropdown:not(.ant-dropdown-hidden), div[role='tooltip']").locator("text=/Yesterday|^Kemarin$|Kemarin/i").first
+                if not btn_date.is_visible(timeout=1500):
+                    btn_date = self.page.locator("text=/Yesterday|^Kemarin$|Kemarin/i").first
+
+            if btn_date.is_visible(timeout=2000):
+                btn_date.click(force=True)
             self.page.wait_for_timeout(800)
         except Exception as ex:
             logger.warning("Error applying date filter for creator", error=str(ex))
@@ -253,17 +258,20 @@ class CreatorScraper:
 
                         if creator_rev_val < effective_min:
                             logger.info(
-                                "Creator revenue below minimum threshold",
+                                "Creator revenue below minimum threshold - stopping creator scrape",
                                 revenue=creator_rev_val,
                                 raw_revenue=creator_rev_raw,
                                 threshold=effective_min,
-                                country=self.country_code,
-                                manual_mode=bool(max_creators)
+                                country=self.country_code
                             )
-                            if max_creators:
-                                continue
                             stop_scraping = True
                             break
+                    elif min_revenue and creator_rev_raw and creator_rev_raw not in ["-", "N/A", "null"]:
+                        logger.warning(
+                            "Could not parse creator revenue from table cell",
+                            raw_revenue=creator_rev_raw,
+                            country=self.country_code
+                        )
 
                     # Extract creator name
                     creator_name_raw = tds[1].inner_text().strip()

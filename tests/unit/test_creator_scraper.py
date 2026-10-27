@@ -183,11 +183,80 @@ class TestCreatorScraperRevenueThreshold:
         res_th = scraper_th.scrape_creators(max_creators=None, min_revenue=110000.0)
         assert res_th["total_creators"] == 2
 
-    def test_apply_filters_selects_7_days(self):
+    def test_creator_revenue_filter_stops_on_threshold_even_with_high_max_creators(self):
+        page = MagicMock()
+        context = MagicMock()
+        page.context = context
+        prod_tab = MagicMock()
+        context.new_page.return_value = prod_tab
+
+        def make_mock_row(rank_str, name_str, rev_str):
+            row = MagicMock()
+            td0 = MagicMock()
+            td0.inner_text.return_value = rank_str
+            td1 = MagicMock()
+            td1.inner_text.return_value = name_str
+            td1.locator.return_value.first = MagicMock(count=lambda: 0)
+            td2 = MagicMock()
+            td2.inner_text.return_value = rev_str
+            row.locator.return_value.all.return_value = [td0, td1, td2]
+            return row
+
+        # Row 1: Rp 120JT (> 50jt) -> included
+        # Row 2: Rp 60JT (> 50jt)  -> included
+        # Row 3: Rp 45JT (< 50jt)  -> MUST STOP even if max_creators=500!
+        # Row 4: Rp 30JT (< 50jt)  -> never scraped!
+        row1 = make_mock_row("1", "@creator1", "Rp 120JT")
+        row2 = make_mock_row("2", "@creator2", "Rp 60JT")
+        row3 = make_mock_row("3", "@creator3", "Rp 45JT")
+        row4 = make_mock_row("4", "@creator4", "Rp 30JT")
+        page.locator.return_value.all.return_value = [row1, row2, row3, row4]
+
+        detail_tab = MagicMock()
+        detail_tab.is_closed.return_value = False
+        detail_tab.evaluate.return_value = [
+            {"index": 1, "rowKey": "p1", "name": "Prod 1", "revenue": "Rp 1JT", "sales": "100"}
+        ]
+        context.expect_page.return_value.__enter__.return_value = MagicMock(value=detail_tab)
+
+        scraper = CreatorScraper(page, "ID")
+        # Manual cap set to 500: must stop at row 3 and only return 2 creators
+        res = scraper.scrape_creators(max_creators=500, min_revenue=50000000.0)
+        assert res["total_creators"] == 2
+        assert len(res["items"]) == 2
+
+    def test_apply_filters_selects_kemarin_by_default(self):
         page = MagicMock()
         scraper = CreatorScraper(page, "ID")
 
-        # Mock date button and 7 days popup button
+        dt_mock = MagicMock()
+        dt_mock.is_visible.return_value = True
+        btn_kemarin = MagicMock()
+        btn_kemarin.is_visible.return_value = True
+
+        def mock_locator(selector):
+            loc = MagicMock()
+            if "Tanggal" in selector or "Date" in selector:
+                loc.first = dt_mock
+            elif "ant-popover" in selector or "ant-dropdown" in selector or "Yesterday" in selector or "Kemarin" in selector:
+                loc.first = btn_kemarin
+                sub_loc = MagicMock()
+                sub_loc.first = btn_kemarin
+                loc.locator.return_value = sub_loc
+            else:
+                loc.first = MagicMock(is_visible=lambda timeout=0: False)
+            return loc
+
+        page.locator.side_effect = mock_locator
+        scraper.apply_filters()
+
+        dt_mock.click.assert_called_with(force=True)
+        btn_kemarin.click.assert_called_with(force=True)
+
+    def test_apply_filters_selects_7_days_when_specified(self):
+        page = MagicMock()
+        scraper = CreatorScraper(page, "ID")
+
         dt_mock = MagicMock()
         dt_mock.is_visible.return_value = True
         btn_7_days = MagicMock()
@@ -207,7 +276,7 @@ class TestCreatorScraperRevenueThreshold:
             return loc
 
         page.locator.side_effect = mock_locator
-        scraper.apply_filters()
+        scraper.apply_filters(date_preset="7_days")
 
         dt_mock.click.assert_called_with(force=True)
         btn_7_days.click.assert_called_with(force=True)

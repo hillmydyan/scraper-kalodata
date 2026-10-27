@@ -49,6 +49,13 @@ class NumberParser:
         if not raw or raw in ["-", "N/A", "null", "None"]:
             return None, False
 
+        # If multi-line, take the first line containing the primary currency figure
+        if "\n" in raw:
+            raw = raw.split("\n")[0].strip()
+
+        # Remove parenthetical notes or trend signs like (+12%), +12%, -5%
+        raw = re.sub(r"[\(（]?[+-]?\d+(?:[\.,]\d+)?\s*%[\)）]?", "", raw).strip()
+
         country_rule = NUMBER_FORMATS_CONFIG.get(country_code.upper())
         if not country_rule:
             country_rule = NUMBER_FORMATS_CONFIG.get("ID", {})
@@ -84,11 +91,13 @@ class NumberParser:
 
         sorted_suffixes = sorted(combined_suffixes.keys(), key=lambda s: len(str(s)), reverse=True)
         for sfx in sorted_suffixes:
-            pattern = re.compile(rf"{re.escape(str(sfx))}\s*$", re.IGNORECASE)
-            if pattern.search(cleaned):
+            pattern = re.compile(rf"{re.escape(str(sfx))}(?:\s*|[^a-zA-Z0-9]|$)", re.IGNORECASE)
+            m = pattern.search(cleaned)
+            if m:
                 multiplier = float(combined_suffixes[sfx])
                 is_abbreviated = True
-                cleaned = pattern.sub("", cleaned).strip()
+                cleaned = cleaned[:m.start()] + cleaned[m.end():]
+                cleaned = cleaned.strip()
                 break
 
         # Remove any stray characters except digits, dot, comma, minus
