@@ -5,7 +5,7 @@ Follows rules in PRD §6.2, §6.3, §6.4, and §6.6.
 
 import re
 from datetime import date, timedelta
-from typing import Tuple, List
+from typing import Tuple, List, Optional
 import structlog
 from playwright.sync_api import Page
 
@@ -346,3 +346,60 @@ class KalodataNavigator:
 
         logger.info("Revenue source filter not on product list, using detail_breakdown fallback")
         return "detail_breakdown"
+
+    def apply_sales_filter(self, min_sales: Optional[int]) -> bool:
+        """
+        Applies 'Penjualan >= min_sales' filter on Kalodata sidebar (§6.10).
+        Fills the 'Penjualan' / 'Sales' minimum input and submits.
+        """
+        if not min_sales or min_sales <= 0:
+            return False
+
+        logger.info("Applying sales filter on Kalodata sidebar", min_sales=min_sales)
+        self.dismiss_overlays()
+
+        try:
+            # 1. Click Penjualan / Sales in left sidebar
+            sales_trigger = self.page.locator("div, span, li, button").filter(
+                has_text=re.compile(r"^Penjualan$|^Sales$", re.I)
+            ).first
+            if not sales_trigger.is_visible(timeout=2000):
+                sales_trigger = self.page.locator(".ant-dropdown-trigger:has-text('Penjualan'), .ant-dropdown-trigger:has-text('Sales')").first
+            if not sales_trigger.is_visible(timeout=1500):
+                sales_trigger = self.page.locator("text=/^Penjualan$|^Sales$/i").first
+
+            if sales_trigger.is_visible(timeout=2000):
+                sales_trigger.scroll_into_view_if_needed()
+                sales_trigger.click(force=True)
+                self.page.wait_for_timeout(800)
+
+                # 2. In visible popover/dropdown, find input for minimum sales
+                popover = self.page.locator(".ant-popover:not(.ant-popover-hidden), .ant-dropdown:not(.ant-dropdown-hidden), div[role='tooltip']").last
+                if popover.is_visible(timeout=1500):
+                    inputs = popover.locator("input").all()
+                    if inputs:
+                        # First input is always the 'Min' sales value
+                        min_input = inputs[0]
+                        min_input.click()
+                        min_input.fill(str(min_sales))
+                        self.page.wait_for_timeout(400)
+
+                    # 3. Click OK / Apply button in popover
+                    ok_btn = popover.locator("button:has-text('OK'), button:has-text('Apply'), text=/^OK$|^Apply$/i").last
+                    if ok_btn.is_visible(timeout=1000):
+                        ok_btn.click(force=True)
+                        self.page.wait_for_timeout(800)
+
+                    # 4. Click Submit / Kirim on left sidebar if enabled
+                    submit_btn = self.page.locator("button:has-text('Submit'), button:has-text('Kirim')").first
+                    if submit_btn.is_visible(timeout=1500) and submit_btn.is_enabled():
+                        submit_btn.click(force=True)
+                        BaseScraper.pacing_page_delay()
+                        self.page.wait_for_timeout(2000)
+
+                    logger.info("Sales filter applied successfully on Kalodata sidebar", min_sales=min_sales)
+                    return True
+        except Exception as ex:
+            logger.warning("Error applying sales filter on sidebar", error=str(ex))
+
+        return False

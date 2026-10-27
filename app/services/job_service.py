@@ -477,10 +477,25 @@ class JobService:
                     db.commit()
                     nav.apply_category_filter(job.country_code)
 
+                    # Determine minimum product sales threshold
+                    is_manual = (job.run.trigger == "manual") if job.run else False
+                    effective_max = limit if (is_manual and limit and limit > 0) else None
+                    if job.run and isinstance(job.run.summary, dict) and job.run.summary.get("min_sales") is not None:
+                        try:
+                            min_sales = int(job.run.summary["min_sales"])
+                        except (ValueError, TypeError):
+                            min_sales = cls.get_min_product_sales(db)
+                    else:
+                        min_sales = cls.get_min_product_sales(db)
+
                     # Step 5: Revenue Source
                     job.stage = "FILTERING_REVENUE"
                     db.commit()
                     rev_method = nav.apply_revenue_source_filter()
+
+                    # Step 5b: Apply Minimum Sales Filter on Kalodata sidebar
+                    if min_sales and min_sales > 0:
+                        nav.apply_sales_filter(min_sales)
 
                     # Step 6: Scraping Product List & Detail
                     job.stage = "SCRAPING_PRODUCTS"
@@ -496,15 +511,6 @@ class JobService:
                             rows_scanned=scanned_count
                         )
 
-                    is_manual = (job.run.trigger == "manual") if job.run else False
-                    effective_max = limit if (is_manual and limit and limit > 0) else None
-                    if job.run and isinstance(job.run.summary, dict) and job.run.summary.get("min_sales") is not None:
-                        try:
-                            min_sales = int(job.run.summary["min_sales"])
-                        except (ValueError, TypeError):
-                            min_sales = cls.get_min_product_sales(db)
-                    else:
-                        min_sales = cls.get_min_product_sales(db)
                     scrape_res = list_scraper.scrape_products(
                         max_limit=effective_max,
                         min_sales=min_sales,

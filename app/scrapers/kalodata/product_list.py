@@ -95,6 +95,19 @@ class ProductListScraper:
                 logger.info("Scrape job cancellation requested by operator")
                 break
 
+            # Check for Kalodata tier / membership limit modal (e.g. 500 rows limit reached)
+            try:
+                vip_modal = self.page.locator(".ant-modal:has-text('Keanggotaan Diperlukan'), div[role='dialog']:has-text('Enterprise')").first
+                if vip_modal.is_visible(timeout=500):
+                    logger.info("Kalodata membership row limit reached (Keanggotaan Diperlukan), stopping product scrape", total_scanned=total_scanned, items_saved=len(items))
+                    try:
+                        vip_modal.locator(".ant-modal-close, button[aria-label='Close']").first.click(force=True)
+                    except Exception:
+                        pass
+                    break
+            except Exception:
+                pass
+
             # Fetch row locators
             row_sel = sel("product_table_row")
             rows = []
