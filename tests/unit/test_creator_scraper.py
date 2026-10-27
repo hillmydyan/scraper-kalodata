@@ -225,35 +225,7 @@ class TestCreatorScraperRevenueThreshold:
         assert res["total_creators"] == 2
         assert len(res["items"]) == 2
 
-    def test_apply_filters_selects_kemarin_by_default(self):
-        page = MagicMock()
-        scraper = CreatorScraper(page, "ID")
-
-        dt_mock = MagicMock()
-        dt_mock.is_visible.return_value = True
-        btn_kemarin = MagicMock()
-        btn_kemarin.is_visible.return_value = True
-
-        def mock_locator(selector):
-            loc = MagicMock()
-            if "Tanggal" in selector or "Date" in selector:
-                loc.first = dt_mock
-            elif "ant-popover" in selector or "ant-dropdown" in selector or "Yesterday" in selector or "Kemarin" in selector:
-                loc.first = btn_kemarin
-                sub_loc = MagicMock()
-                sub_loc.first = btn_kemarin
-                loc.locator.return_value = sub_loc
-            else:
-                loc.first = MagicMock(is_visible=lambda timeout=0: False)
-            return loc
-
-        page.locator.side_effect = mock_locator
-        scraper.apply_filters()
-
-        dt_mock.click.assert_called_with(force=True)
-        btn_kemarin.click.assert_called_with(force=True)
-
-    def test_apply_filters_selects_7_days_when_specified(self):
+    def test_apply_filters_selects_7_days_by_default(self):
         page = MagicMock()
         scraper = CreatorScraper(page, "ID")
 
@@ -276,8 +248,36 @@ class TestCreatorScraperRevenueThreshold:
             return loc
 
         page.locator.side_effect = mock_locator
-        scraper.apply_filters(date_preset="7_days")
+        scraper.apply_filters()
 
         dt_mock.click.assert_called_with(force=True)
         btn_7_days.click.assert_called_with(force=True)
+
+    def test_apply_filters_selects_kemarin_when_specified(self):
+        page = MagicMock()
+        scraper = CreatorScraper(page, "ID")
+
+        dt_mock = MagicMock()
+        dt_mock.is_visible.return_value = True
+        btn_kemarin = MagicMock()
+        btn_kemarin.is_visible.return_value = True
+
+        def mock_locator(selector):
+            loc = MagicMock()
+            if "Tanggal" in selector or "Date" in selector:
+                loc.first = dt_mock
+            elif "ant-popover" in selector or "ant-dropdown" in selector or "Yesterday" in selector or "Kemarin" in selector:
+                loc.first = btn_kemarin
+                sub_loc = MagicMock()
+                sub_loc.first = btn_kemarin
+                loc.locator.return_value = sub_loc
+            else:
+                loc.first = MagicMock(is_visible=lambda timeout=0: False)
+            return loc
+
+        page.locator.side_effect = mock_locator
+        scraper.apply_filters(date_preset="kemarin")
+
+        dt_mock.click.assert_called_with(force=True)
+        btn_kemarin.click.assert_called_with(force=True)
 

@@ -49,10 +49,10 @@ class CreatorScraper:
         except Exception:
             pass
 
-    def apply_filters(self, date_preset: str = "kemarin") -> bool:
+    def apply_filters(self, date_preset: str = "7_days") -> bool:
         """
         Applies:
-        1. Tanggal: Kemarin (or 7 hari terakhir if date_preset == '7_days')
+        1. Tanggal: 7 hari terakhir (or Kemarin if date_preset == 'kemarin')
         2. Kategori: Bawahan Wanita
         3. Sumber Pendapatan: Video
         4. Tipe Akun: Mandiri
@@ -61,7 +61,7 @@ class CreatorScraper:
         logger.info("Applying creator filters", country=self.country_code, date_preset=date_preset)
         self.dismiss_overlays()
 
-        # 1. Date filter (default: Kemarin / Yesterday)
+        # 1. Date filter (default: 7 hari terakhir / Last 7 days)
         try:
             logger.info("Setting Creator Date Filter", date_preset=date_preset)
             dt = self.page.locator("div.cursor-pointer:has-text('Tanggal'), div.cursor-pointer:has-text('Date'), .ant-dropdown-trigger:has-text('Tanggal'), .ant-dropdown-trigger:has-text('Date')").first
@@ -71,15 +71,15 @@ class CreatorScraper:
                 self.page.locator("text=/^Tanggal$|^Date$/i").first.click(force=True)
             self.page.wait_for_timeout(800)
 
-            if date_preset in ("7_days", "7_hari", "last_7_days"):
-                btn_date = self.page.locator(".ant-popover:not(.ant-popover-hidden), .ant-dropdown:not(.ant-dropdown-hidden), div[role='tooltip']").locator("text=/7\\s*hari\\s*terakhir|Last\\s*7\\s*days|Past\\s*7\\s*days/i").first
-                if not btn_date.is_visible(timeout=1500):
-                    btn_date = self.page.locator("text=/7\\s*hari\\s*terakhir|Last\\s*7\\s*days|Past\\s*7\\s*days/i").first
-            else:
-                # Default: Kemarin / Yesterday (1 hari)
+            if date_preset in ("kemarin", "yesterday"):
                 btn_date = self.page.locator(".ant-popover:not(.ant-popover-hidden), .ant-dropdown:not(.ant-dropdown-hidden), div[role='tooltip']").locator("text=/Yesterday|^Kemarin$|Kemarin/i").first
                 if not btn_date.is_visible(timeout=1500):
                     btn_date = self.page.locator("text=/Yesterday|^Kemarin$|Kemarin/i").first
+            else:
+                # Default: 7 hari terakhir / Last 7 days
+                btn_date = self.page.locator(".ant-popover:not(.ant-popover-hidden), .ant-dropdown:not(.ant-dropdown-hidden), div[role='tooltip']").locator("text=/7\\s*hari\\s*terakhir|Last\\s*7\\s*days|Past\\s*7\\s*days/i").first
+                if not btn_date.is_visible(timeout=1500):
+                    btn_date = self.page.locator("text=/7\\s*hari\\s*terakhir|Last\\s*7\\s*days|Past\\s*7\\s*days/i").first
 
             if btn_date.is_visible(timeout=2000):
                 btn_date.click(force=True)

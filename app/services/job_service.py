@@ -404,7 +404,7 @@ class JobService:
                     db.commit()
 
                     creator_scraper = CreatorScraper(page, job.country_code, job_id=job.id)
-                    creator_scraper.apply_filters(date_preset="kemarin")
+                    creator_scraper.apply_filters(date_preset="7_days")
 
                     def checkpoint_cb(current_items, scanned_count):
                         cls.save_checkpoint(
