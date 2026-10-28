@@ -357,78 +357,138 @@ class KalodataNavigator:
 
         logger.info("Applying sales filter on Kalodata sidebar", min_sales=min_sales, max_sales=max_sales)
         self.dismiss_overlays()
+        self.page.wait_for_timeout(1000)
+        try:
+            self.page.wait_for_selector(".ant-spin-spinning", state="detached", timeout=3000)
+        except Exception:
+            pass
 
         try:
             # 1. Click Penjualan / Sales in left sidebar
-            # Ensure we do NOT click the table header, by searching inside sidebar / aside / filter panel
             sales_trigger = None
-            sidebar_selectors = [
-                "aside",
-                ".ant-layout-sider",
-                "div[class*='Filter']",
-                "div[class*='filter']",
-                "div[class*='sider']",
-                "div[class*='sidebar']"
-            ]
-            for s_sel in sidebar_selectors:
-                s_elem = self.page.locator(s_sel).first
-                if s_elem.is_visible(timeout=500):
-                    cand = s_elem.locator("div, span, p").filter(has_text=re.compile(r"^Penjualan$|^Sales$", re.I)).first
-                    if cand.is_visible(timeout=500):
+
+            # Strategy 1: Find text element strictly equal to "Penjualan" or "Sales" located in the sidebar (x < 350)
+            try:
+                candidates = self.page.get_by_text(re.compile(r"^\s*(Penjualan|Sales)\s*$", re.I)).all()
+                for cand in candidates:
+                    try:
+                        if not cand.is_visible(timeout=300):
+                            continue
+                        box = cand.bounding_box()
+                        if box and box["x"] < 350 and box["y"] > 80:
+                            # Ensure element is not inside a table header or table body
+                            in_table = cand.evaluate("el => !!el.closest('table, thead, th, tr, [role=\"table\"], [role=\"columnheader\"]')")
+                            if not in_table:
+                                sales_trigger = cand
+                                logger.info("Found sales_trigger via get_by_text on sidebar", box=box)
+                                break
+                    except Exception:
+                        continue
+            except Exception as ex:
+                logger.debug("Strategy 1 get_by_text error", error=str(ex))
+
+            # Strategy 2: Relative XPath preceding 'Sumber Pendapatan' or 'Revenue Source'
+            if not sales_trigger:
+                try:
+                    prec_xpath = "//div[contains(., 'Sumber Pendapatan') or contains(., 'Revenue Source')]/preceding::*[normalize-space(text())='Penjualan' or normalize-space(text())='Sales'][1]"
+                    cand = self.page.locator(f"xpath={prec_xpath}").first
+                    if cand.is_visible(timeout=1000):
                         sales_trigger = cand
-                        break
+                        logger.info("Found sales_trigger via preceding sibling XPath")
+                except Exception as ex:
+                    logger.debug("Strategy 2 preceding XPath error", error=str(ex))
 
-            if not sales_trigger or not sales_trigger.is_visible(timeout=500):
-                sales_trigger = self.page.locator("div.inline-flex.items-center:has-text('Penjualan'), div.inline-flex.items-center:has-text('Sales')").first
+            # Strategy 3: Normalized text XPath not in table with x < 350
+            if not sales_trigger:
+                try:
+                    xp = "//*[not(ancestor-or-self::table or ancestor-or-self::thead or ancestor-or-self::th or ancestor-or-self::tr)][normalize-space(text())='Penjualan' or normalize-space(text())='Sales']"
+                    for cand in self.page.locator(f"xpath={xp}").all():
+                        if cand.is_visible(timeout=300):
+                            box = cand.bounding_box()
+                            if box and box["x"] < 350 and box["y"] > 80:
+                                sales_trigger = cand
+                                logger.info("Found sales_trigger via XPath outside table", box=box)
+                                break
+                except Exception as ex:
+                    logger.debug("Strategy 3 XPath error", error=str(ex))
 
-            if not sales_trigger or not sales_trigger.is_visible(timeout=500):
-                sales_trigger = self.page.locator(".ant-dropdown-trigger:has-text('Penjualan'), .ant-dropdown-trigger:has-text('Sales')").first
+            if not sales_trigger or not sales_trigger.is_visible(timeout=2000):
+                logger.warning("Could not find Penjualan / Sales sidebar trigger")
+                return False
 
-            if not sales_trigger or not sales_trigger.is_visible(timeout=500):
-                sales_trigger = self.page.locator("aside text=/^Penjualan$|^Sales$/i, div:not(table *):not(thead *):has-text('Penjualan')").first
+            # Click the trigger to open popover
+            sales_trigger.scroll_into_view_if_needed()
+            sales_trigger.click(force=True)
+            self.page.wait_for_timeout(800)
 
-            if sales_trigger and sales_trigger.is_visible(timeout=2000):
-                sales_trigger.scroll_into_view_if_needed()
-                sales_trigger.click(force=True)
-                self.page.wait_for_timeout(800)
+            # Check visible popover
+            popover = self.page.locator(".ant-popover:not(.ant-popover-hidden), div[role='tooltip']:not([aria-hidden='true'])").last
+            if not popover.is_visible(timeout=1000):
+                logger.info("Popover not immediately visible, attempting click on parent row container...")
+                parent_row = sales_trigger.locator("xpath=ancestor::div[contains(@class, 'item') or contains(@class, 'flex') or contains(@class, 'trigger') or contains(@class, 'ant-')][1]")
+                if parent_row.is_visible(timeout=500):
+                    parent_row.click(force=True)
+                    self.page.wait_for_timeout(800)
+                    popover = self.page.locator(".ant-popover:not(.ant-popover-hidden), div[role='tooltip']:not([aria-hidden='true'])").last
 
-                # 2. In visible popover/dropdown, find the sales filter popover (matches presets 0 ~ 50, >10RB)
-                popover = self.page.locator("div:has-text('0 ~ 50'):has-text('>10RB'), div.ant-popover:has-text('0 ~ 50'), .ant-popover:not(.ant-popover-hidden), .ant-dropdown:not(.ant-dropdown-hidden)").last
-                if popover.is_visible(timeout=2000):
-                    inputs = popover.locator("input").all()
-                    if inputs and len(inputs) >= 1:
-                        # First input is the 'Min' sales value (e.g. 50, 1000)
-                        min_input = inputs[0]
-                        min_input.click()
-                        min_input.fill("")
-                        if min_sales and min_sales > 0:
-                            min_input.fill(str(min_sales))
-                        self.page.wait_for_timeout(400)
+            # 2. Fill the inputs inside visible popover
+            if not popover.is_visible(timeout=2000):
+                logger.warning("Sales popover did not appear after clicking Penjualan")
+                return False
 
-                        # Second input is the 'Max' sales value (e.g. 10000)
-                        if len(inputs) >= 2:
-                            max_input = inputs[1]
-                            max_input.click()
-                            max_input.fill("")
-                            if max_sales and max_sales > 0:
-                                max_input.fill(str(max_sales))
-                            self.page.wait_for_timeout(400)
+            inputs = popover.locator("input").all()
+            if not inputs:
+                logger.warning("No input elements found in sales popover")
+                return False
 
-                    # 3. Click blue OK button in popover
-                    ok_btn = popover.locator("button:has-text('OK'), button.ant-btn-primary, button:has-text('Apply')").last
-                    if ok_btn.is_visible(timeout=1500):
-                        ok_btn.click(force=True)
-                        self.page.wait_for_timeout(1000)
+            # First input: Min sales
+            min_input = inputs[0]
+            min_input.click()
+            min_input.fill("")
+            min_input.press("Control+A")
+            min_input.press("Backspace")
+            if min_sales and min_sales > 0:
+                min_input.fill(str(min_sales))
+                try:
+                    min_input.dispatch_event("input")
+                    min_input.dispatch_event("change")
+                except Exception:
+                    pass
+            self.page.wait_for_timeout(300)
 
-                    # 4. Click Submit / Kirim on left sidebar if enabled
-                    submit_btn = self.page.locator("button:has-text('Submit'), button:has-text('Kirim')").first
-                    if submit_btn.is_visible(timeout=1500) and submit_btn.is_enabled():
-                        submit_btn.click(force=True)
-                        BaseScraper.pacing_page_delay()
-                        self.page.wait_for_timeout(2000)
+            # Second input: Max sales (if available)
+            if len(inputs) >= 2:
+                max_input = inputs[1]
+                max_input.click()
+                max_input.fill("")
+                max_input.press("Control+A")
+                max_input.press("Backspace")
+                if max_sales and max_sales > 0:
+                    max_input.fill(str(max_sales))
+                    try:
+                        max_input.dispatch_event("input")
+                        max_input.dispatch_event("change")
+                    except Exception:
+                        pass
+                self.page.wait_for_timeout(300)
 
-                    logger.info("Sales filter applied successfully on Kalodata sidebar", min_sales=min_sales, max_sales=max_sales)
-                    return True
+            # 3. Click blue 'OK' button inside the popover
+            ok_btn = popover.locator("button:has-text('OK'), button.ant-btn-primary, text=/^OK$/i").last
+            if ok_btn.is_visible(timeout=1500):
+                ok_btn.click(force=True)
+                self.page.wait_for_timeout(1000)
+            else:
+                logger.warning("OK button in sales popover not found")
+
+            # 4. Click Submit / Kirim on left sidebar if enabled
+            submit_btn = self.page.locator("button:has-text('Submit'), button:has-text('Kirim')").first
+            if submit_btn.is_visible(timeout=1500) and submit_btn.is_enabled():
+                submit_btn.click(force=True)
+                BaseScraper.pacing_page_delay()
+                self.page.wait_for_timeout(2000)
+
+            logger.info("Sales filter applied successfully on Kalodata sidebar", min_sales=min_sales, max_sales=max_sales)
+            return True
         except Exception as ex:
             logger.warning("Error applying sales filter on sidebar", error=str(ex))
 

@@ -67,3 +67,71 @@ class TestKalodataNavigatorRegionSwitch:
         with pytest.raises(NavigationError) as exc_info:
             nav.switch_and_verify_region("MY")
         assert exc_info.value.error_code == "COUNTRY_MISMATCH"
+
+
+class TestKalodataNavigatorSalesFilter:
+    def test_apply_sales_filter_no_thresholds_returns_false(self):
+        page = MagicMock()
+        nav = KalodataNavigator(page)
+        assert nav.apply_sales_filter(None, None) is False
+        assert nav.apply_sales_filter(0, 0) is False
+
+    def test_apply_sales_filter_success(self):
+        page = MagicMock()
+
+        # Trigger candidate
+        cand = MagicMock()
+        cand.is_visible.return_value = True
+        cand.bounding_box.return_value = {"x": 120, "y": 250, "width": 80, "height": 30}
+        cand.evaluate.return_value = False  # not in table
+        page.get_by_text.return_value.all.return_value = [cand]
+
+        # Popover and inputs
+        popover = MagicMock()
+        popover.is_visible.return_value = True
+        min_input = MagicMock()
+        max_input = MagicMock()
+
+        input_loc = MagicMock()
+        input_loc.all.return_value = [min_input, max_input]
+
+        ok_btn = MagicMock()
+        ok_btn.is_visible.return_value = True
+
+        submit_btn = MagicMock()
+        submit_btn.is_visible.return_value = True
+        submit_btn.is_enabled.return_value = True
+
+        def page_loc_side_effect(selector):
+            mock_loc = MagicMock()
+            if "ant-popover" in selector:
+                mock_loc.last = popover
+            elif "button:has-text('Submit')" in selector or "button:has-text('Kirim')" in selector:
+                mock_loc.first = submit_btn
+            else:
+                mock_loc.first = MagicMock(is_visible=lambda timeout=None: False)
+                mock_loc.last = MagicMock(is_visible=lambda timeout=None: False)
+            return mock_loc
+
+        def popover_loc_side_effect(selector):
+            if selector == "input":
+                return input_loc
+            mock_loc = MagicMock()
+            if "OK" in selector:
+                mock_loc.last = ok_btn
+            return mock_loc
+
+        page.locator.side_effect = page_loc_side_effect
+        popover.locator.side_effect = popover_loc_side_effect
+
+        nav = KalodataNavigator(page)
+        res = nav.apply_sales_filter(min_sales=1000, max_sales=10000)
+
+        assert res is True
+        cand.click.assert_called_once()
+        min_input.fill.assert_any_call("1000")
+        max_input.fill.assert_any_call("10000")
+        ok_btn.click.assert_called_once()
+        submit_btn.click.assert_called_once()
+
+
