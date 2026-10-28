@@ -447,80 +447,54 @@ class KalodataNavigator:
                     except Exception:
                         pass
 
-            # 2. Check if preset matches (e.g. 50 ~ 500, >10k)
-            preset_applied = False
-            preset_regex = None
-            if min_sales == 0 and max_sales == 50:
-                preset_regex = re.compile(r"0\s*~\s*50", re.I)
-            elif min_sales == 50 and max_sales == 500:
-                preset_regex = re.compile(r"50\s*~\s*500|~\s*500", re.I)
-            elif min_sales == 500 and max_sales == 5000:
-                preset_regex = re.compile(r"500\s*~\s*(5k|5rb)", re.I)
-            elif min_sales == 5000 and max_sales == 10000:
-                preset_regex = re.compile(r"(5k|5rb)\s*~\s*(10k|10rb)", re.I)
-            elif min_sales == 10000 and not max_sales:
-                preset_regex = re.compile(r">(10k|10rb)", re.I)
+            # 2. Fill the Minimal and Maksimal input boxes inside the popover
+            if not popover.is_visible(timeout=2000):
+                logger.warning("Sales popover did not appear after clicking Item Sold / Penjualan")
+                return False
 
-            if preset_regex:
+            inputs = popover.locator("input").all()
+            if not inputs:
+                logger.warning("No input elements found in sales popover")
+                return False
+
+            # First input: Minimal sales
+            min_input = inputs[0]
+            min_input.click()
+            min_input.fill("")
+            min_input.press("Control+A")
+            min_input.press("Backspace")
+            if min_sales and min_sales > 0:
+                min_input.fill(str(min_sales))
                 try:
-                    preset_item = self.page.locator("[role='menuitem'], .ant-dropdown-menu-item, li, div").filter(has_text=preset_regex).first
-                    if preset_item.is_visible(timeout=1000):
-                        preset_item.click(force=True)
-                        preset_applied = True
-                        logger.info("Applied sales filter via matching preset menuitem", regex=str(preset_regex))
-                        self.page.wait_for_timeout(800)
-                except Exception as p_err:
-                    logger.debug("Preset click error", error=str(p_err))
+                    min_input.dispatch_event("input")
+                    min_input.dispatch_event("change")
+                except Exception:
+                    pass
+            self.page.wait_for_timeout(300)
 
-            # 3. If no preset applied, fill input boxes in visible popover
-            if not preset_applied:
-                if not popover.is_visible(timeout=2000):
-                    logger.warning("Sales popover did not appear after clicking Item Sold / Penjualan")
-                    return False
-
-                inputs = popover.locator("input").all()
-                if not inputs:
-                    logger.warning("No input elements found in sales popover")
-                    return False
-
-                # First input: Min sales
-                min_input = inputs[0]
-                min_input.click()
-                min_input.fill("")
-                min_input.press("Control+A")
-                min_input.press("Backspace")
-                if min_sales and min_sales > 0:
-                    min_input.fill(str(min_sales))
+            # Second input: Maksimal sales (if available)
+            if len(inputs) >= 2:
+                max_input = inputs[1]
+                max_input.click()
+                max_input.fill("")
+                max_input.press("Control+A")
+                max_input.press("Backspace")
+                if max_sales and max_sales > 0:
+                    max_input.fill(str(max_sales))
                     try:
-                        min_input.dispatch_event("input")
-                        min_input.dispatch_event("change")
+                        max_input.dispatch_event("input")
+                        max_input.dispatch_event("change")
                     except Exception:
                         pass
                 self.page.wait_for_timeout(300)
 
-                # Second input: Max sales (if available)
-                if len(inputs) >= 2:
-                    max_input = inputs[1]
-                    max_input.click()
-                    max_input.fill("")
-                    max_input.press("Control+A")
-                    max_input.press("Backspace")
-                    if max_sales and max_sales > 0:
-                        max_input.fill(str(max_sales))
-                        try:
-                            max_input.dispatch_event("input")
-                            max_input.dispatch_event("change")
-                        except Exception:
-                            pass
-                    self.page.wait_for_timeout(300)
-
-                # Click blue 'OK' button inside the popover
-                ok_btn = popover.locator("button:has-text('OK'), button.ant-btn-primary, text=/^OK$/i").last
-                if ok_btn.is_visible(timeout=1500):
-                    ok_btn.click(force=True)
-                    self.page.wait_for_timeout(1000)
-                else:
-                    logger.warning("OK button in sales popover not found")
+            # 3. Click blue 'OK' button inside the popover
+            ok_btn = popover.locator("button:has-text('OK'), button.ant-btn-primary, text=/^OK$/i").last
+            if ok_btn.is_visible(timeout=1500):
+                ok_btn.click(force=True)
+                self.page.wait_for_timeout(1000)
+            else:
+                logger.warning("OK button in sales popover not found")
 
             # 4. Click Submit / Kirim on left sidebar if enabled
             submit_btn = self.page.locator("button:has-text('Submit'), button:has-text('Kirim')").first
