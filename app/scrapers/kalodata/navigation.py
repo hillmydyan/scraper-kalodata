@@ -313,8 +313,14 @@ class KalodataNavigator:
         self.dismiss_overlays()
 
         try:
-            # 1. Click Sumber Pendapatan(Konten) in left sidebar
-            spk = self.page.locator("div:has-text('Sumber Pendapatan(Konten)'), div:has-text('Revenue Source')").last
+            # 1. Click Sumber Pendapatan(Konten) / Revenue Source (Content) in left sidebar
+            # Exclude 'Channel' to avoid opening Livestream/Channel popover
+            spk = self.page.locator(
+                "div:has-text('Sumber Pendapatan(Konten)'), "
+                "div:has-text('Revenue Source (Content)'), "
+                "div:has-text('Sumber Pendapatan'):not(:has-text('Channel')):not(:has-text('Cha')), "
+                "div:has-text('Revenue Source'):not(:has-text('Channel')):not(:has-text('Cha'))"
+            ).first
             if spk.is_visible(timeout=2000):
                 spk.scroll_into_view_if_needed()
                 spk.click()
