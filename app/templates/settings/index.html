@@ -63,7 +63,7 @@
         {{ icon('server', 20, color='var(--color-primary)') }}
         <h2 class="card-title" style="margin: 0;">Batas &amp; Parameter Scraper</h2>
       </div>
-      <span class="badge" style="background: rgba(37, 99, 235, 0.1); color: var(--color-primary); font-weight: 700; font-size: 0.75rem; padding: 0.2rem 0.5rem; border-radius: 4px;">Min. Penjualan: &gt; {{ settings.min_product_sales }} Pcs</span>
+      <span class="badge" style="background: rgba(37, 99, 235, 0.1); color: var(--color-primary); font-weight: 700; font-size: 0.75rem; padding: 0.2rem 0.5rem; border-radius: 4px;">Min. Penjualan: &ge; {{ settings.min_product_sales }} Pcs</span>
     </div>
 
     <!-- Form Ubah Batas Penjualan Produk -->
@@ -81,7 +81,7 @@
         </button>
       </div>
       <span style="display: block; font-size: 0.75rem; color: var(--color-text-muted); margin-top: 0.3rem;">
-        Hanya produk dengan penjualan di atas angka ini yang akan ditarik dan diekspor.
+        Hanya produk dengan penjualan minimal angka ini (&ge;) yang akan ditarik dan diekspor.
       </span>
     </form>
 
