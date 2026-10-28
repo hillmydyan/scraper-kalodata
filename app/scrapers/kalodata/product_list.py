@@ -78,8 +78,10 @@ class ProductListScraper:
 
         page_number = 1
         total_scanned = 0
+        consecutive_rejects = 0
+        stop_scraping = False
 
-        while max_limit is None or len(items) < max_limit:
+        while not stop_scraping and (max_limit is None or len(items) < max_limit):
             self.dismiss_overlays()
 
             # Check for Cloudflare challenge and wait for operator if needed
@@ -129,9 +131,11 @@ class ProductListScraper:
             for row_idx, row in enumerate(rows):
                 if max_limit is not None and len(items) >= max_limit:
                     is_truncated = True
+                    stop_scraping = True
                     break
 
                 if cancel_check_cb and cancel_check_cb():
+                    stop_scraping = True
                     break
 
                 total_scanned += 1
@@ -147,24 +151,43 @@ class ProductListScraper:
                         "reason": "EMPTY_OR_UNPARSEABLE_ROW",
                         "raw": {"text": row_text}
                     })
+                    consecutive_rejects += 1
                     continue
 
-                # Filter products with sales <= min_sales (e.g. sales > 50) before opening detail tab
+                # Filter products with sales < min_sales (e.g. sales >= 50 passes, sales < 50 rejected)
                 sales_val = extracted.get("sales_value")
                 if min_sales is not None:
-                    if sales_val is None or sales_val <= min_sales:
+                    if sales_val is None or sales_val < min_sales:
                         rejected.append({
                             "row_index": total_scanned,
                             "reason": f"SALES_BELOW_MIN_{min_sales}",
                             "raw": extracted
                         })
+                        consecutive_rejects += 1
                         logger.info(
-                            "Skipping product with sales <= min_sales",
+                            "Skipping product with sales < min_sales",
                             sales=sales_val,
                             raw_sales=extracted.get("sales_raw"),
                             min_sales=min_sales,
                             product_name=extracted.get("product_name")
                         )
+                        # Early exit guard: if 40 consecutive rows on initial pages fail, stop early
+                        if len(items) == 0 and consecutive_rejects >= 40:
+                            logger.info(
+                                "Early exit: 40 consecutive products below min_sales on initial pages. Stopping scrape to avoid hitting tier limit.",
+                                total_scanned=total_scanned,
+                                min_sales=min_sales
+                            )
+                            stop_scraping = True
+                            break
+                        elif len(items) > 0 and consecutive_rejects >= 60:
+                            logger.info(
+                                "Early exit: 60 consecutive products below min_sales after saving items. Stopping scrape.",
+                                total_scanned=total_scanned,
+                                items_saved=len(items)
+                            )
+                            stop_scraping = True
+                            break
                         continue
 
                 # Open detail tab to select 1 video and extract video breakdown
@@ -185,6 +208,7 @@ class ProductListScraper:
                                 "reason": "NO_VIDEO_REVENUE",
                                 "raw": extracted
                             })
+                            consecutive_rejects += 1
                             continue
 
                         if detail_info.get("shop_name"):
@@ -207,13 +231,19 @@ class ProductListScraper:
                         "reason": reason,
                         "raw": extracted
                     })
+                    consecutive_rejects += 1
                     continue
 
+                # Row accepted
+                consecutive_rejects = 0
                 items.append(extracted)
 
                 # Checkpoint callback (§6.5 no. 9)
                 if checkpoint_cb and len(items) % settings.CHECKPOINT_EVERY == 0:
                     checkpoint_cb(items, total_scanned)
+
+            if stop_scraping:
+                break
 
             # Pagination: look for 'Next' button
             try:
@@ -429,7 +459,7 @@ class ProductListScraper:
         sales = row.get("sales_value")
         if sales is not None and sales < 0:
             return False, "INVALID_SALES_NEGATIVE"
-        if min_sales is not None and (sales is None or sales <= min_sales):
+        if min_sales is not None and (sales is None or sales < min_sales):
             return False, f"SALES_BELOW_MIN_{min_sales}"
 
         comm = row.get("commission_rate")

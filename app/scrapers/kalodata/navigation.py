@@ -360,35 +360,65 @@ class KalodataNavigator:
 
         try:
             # 1. Click Penjualan / Sales in left sidebar
-            sales_trigger = self.page.locator("div, span, li, button").filter(
-                has_text=re.compile(r"^Penjualan$|^Sales$", re.I)
-            ).first
-            if not sales_trigger.is_visible(timeout=2000):
-                sales_trigger = self.page.locator(".ant-dropdown-trigger:has-text('Penjualan'), .ant-dropdown-trigger:has-text('Sales')").first
-            if not sales_trigger.is_visible(timeout=1500):
-                sales_trigger = self.page.locator("text=/^Penjualan$|^Sales$/i").first
+            # Ensure we do NOT click the table header, by searching inside sidebar / aside / filter panel
+            sales_trigger = None
+            sidebar_selectors = [
+                "aside",
+                ".ant-layout-sider",
+                "div[class*='Filter']",
+                "div[class*='filter']",
+                "div[class*='sider']",
+                "div[class*='sidebar']"
+            ]
+            for s_sel in sidebar_selectors:
+                s_elem = self.page.locator(s_sel).first
+                if s_elem.is_visible(timeout=500):
+                    cand = s_elem.locator("div, span, p").filter(has_text=re.compile(r"^Penjualan$|^Sales$", re.I)).first
+                    if cand.is_visible(timeout=500):
+                        sales_trigger = cand
+                        break
 
-            if sales_trigger.is_visible(timeout=2000):
+            if not sales_trigger or not sales_trigger.is_visible(timeout=500):
+                sales_trigger = self.page.locator("div.inline-flex.items-center:has-text('Penjualan'), div.inline-flex.items-center:has-text('Sales')").first
+
+            if not sales_trigger or not sales_trigger.is_visible(timeout=500):
+                sales_trigger = self.page.locator(".ant-dropdown-trigger:has-text('Penjualan'), .ant-dropdown-trigger:has-text('Sales')").first
+
+            if not sales_trigger or not sales_trigger.is_visible(timeout=500):
+                sales_trigger = self.page.locator("aside text=/^Penjualan$|^Sales$/i, div:not(table *):not(thead *):has-text('Penjualan')").first
+
+            if sales_trigger and sales_trigger.is_visible(timeout=2000):
                 sales_trigger.scroll_into_view_if_needed()
                 sales_trigger.click(force=True)
                 self.page.wait_for_timeout(800)
 
-                # 2. In visible popover/dropdown, find input for minimum sales
-                popover = self.page.locator(".ant-popover:not(.ant-popover-hidden), .ant-dropdown:not(.ant-dropdown-hidden), div[role='tooltip']").last
-                if popover.is_visible(timeout=1500):
+                # 2. In visible popover/dropdown, find the sales filter popover (matches presets 0 ~ 50, >10RB)
+                popover = self.page.locator("div:has-text('0 ~ 50'):has-text('>10RB'), div.ant-popover:has-text('0 ~ 50'), .ant-popover:not(.ant-popover-hidden), .ant-dropdown:not(.ant-dropdown-hidden)").last
+                if popover.is_visible(timeout=2000):
                     inputs = popover.locator("input").all()
-                    if inputs:
-                        # First input is always the 'Min' sales value
+                    if inputs and len(inputs) >= 1:
+                        # First input is the 'Min' sales value (e.g. 50, 1000)
                         min_input = inputs[0]
                         min_input.click()
+                        min_input.fill("")
                         min_input.fill(str(min_sales))
                         self.page.wait_for_timeout(400)
 
-                    # 3. Click OK / Apply button in popover
-                    ok_btn = popover.locator("button:has-text('OK'), button:has-text('Apply'), text=/^OK$|^Apply$/i").last
-                    if ok_btn.is_visible(timeout=1000):
+                        # If there is a second input (Max) and it's less than min_sales, clear it
+                        if len(inputs) >= 2:
+                            max_input = inputs[1]
+                            try:
+                                max_val = max_input.input_value()
+                                if max_val and int(max_val) < min_sales:
+                                    max_input.fill("")
+                            except Exception:
+                                pass
+
+                    # 3. Click blue OK button in popover
+                    ok_btn = popover.locator("button:has-text('OK'), button.ant-btn-primary, button:has-text('Apply')").last
+                    if ok_btn.is_visible(timeout=1500):
                         ok_btn.click(force=True)
-                        self.page.wait_for_timeout(800)
+                        self.page.wait_for_timeout(1000)
 
                     # 4. Click Submit / Kirim on left sidebar if enabled
                     submit_btn = self.page.locator("button:has-text('Submit'), button:has-text('Kirim')").first

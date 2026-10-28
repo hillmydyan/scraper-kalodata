@@ -4,16 +4,16 @@ from app.scrapers.kalodata.product_list import ProductListScraper
 
 
 class TestProductListScraperSalesThreshold:
-    def test_validate_row_rejects_sales_150_or_below(self):
+    def test_validate_row_rejects_sales_below_150(self):
         page = MagicMock()
         scraper = ProductListScraper(page, "ID")
 
-        # Sales <= 150 should fail validation
+        # Sales 149 (< 150) should fail validation
         valid, reason = scraper._validate_row({
             "source_product_id": "12345",
             "product_name": "Celana Kulot Wanita",
             "revenue_value": 500000.0,
-            "sales_value": 150,
+            "sales_value": 149,
             "commission_rate": 0.1
         }, min_sales=150)
         assert valid is False
@@ -71,13 +71,20 @@ class TestProductListScraperSalesThreshold:
         page = MagicMock()
         scraper = ProductListScraper(page, "ID")
 
-        # Custom threshold 50: 60 passes, 40 fails
+        # Custom threshold 50: 60 and 50 pass (inclusive), 40 fails
         valid, _ = scraper._validate_row({
             "source_product_id": "123",
             "product_name": "Test Item",
             "sales_value": 60
         }, min_sales=50)
         assert valid is True
+
+        valid_exact, _ = scraper._validate_row({
+            "source_product_id": "123",
+            "product_name": "Test Item",
+            "sales_value": 50
+        }, min_sales=50)
+        assert valid_exact is True
 
         valid, reason = scraper._validate_row({
             "source_product_id": "123",
