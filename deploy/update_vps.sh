@@ -15,7 +15,14 @@ echo "================================================================="
 cd "$APP_DIR"
 
 echo "[1/3] Menarik kode pembaruan terbaru dari Git..."
+# Stash local runtime changes (seperti kalodata_session.json yang terupdate saat scraping) agar git pull tidak conflict
+git stash || true
 git pull origin main
+
+# Update package editable mode jika venv tersedia
+if [ -f "$APP_DIR/venv/bin/pip" ]; then
+    "$APP_DIR/venv/bin/pip" install -e "$APP_DIR" --no-deps >/dev/null 2>&1 || true
+fi
 
 # Jika ada systemd services
 if systemctl list-unit-files | grep -q "kalodata-worker"; then
