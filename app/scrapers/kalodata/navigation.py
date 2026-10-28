@@ -330,37 +330,49 @@ class KalodataNavigator:
             # 2. Click Sumber Pendapatan(Konten) / Revenue Source (Content) in left sidebar
             # Exclude 'Channel' to avoid opening Livestream/Channel popover
             spk = None
-            for term in ["Sumber Pendapat", "Revenue Source"]:
+            for term in [
+                re.compile(r"Sumber\s*Pendapatan.*Kon", re.I),
+                re.compile(r"Revenue\s*Source.*Cont", re.I),
+                "Sumber Pendapatan(Kon",
+                "Sumber Pendapatan",
+                "Revenue Source"
+            ]:
                 try:
-                    candidates = self.page.get_by_text(term, exact=False).all()
+                    if isinstance(term, str):
+                        candidates = self.page.get_by_text(term, exact=False).all()
+                    else:
+                        candidates = self.page.get_by_text(term).all()
                     for cand in candidates:
                         try:
                             if not cand.is_visible(timeout=300):
                                 continue
                             box = cand.bounding_box()
-                            if not box or box["x"] > 350 or box["y"] < 60:
+                            # Single menu item row must have height <= 55 and height >= 15 on sidebar (x < 350, y > 60)
+                            if not box or box["x"] > 350 or box["y"] < 60 or box["height"] > 55 or box["height"] < 15:
                                 continue
                             in_table = cand.evaluate("el => !!el.closest('table, thead, th, tr, [role=\"table\"], [role=\"columnheader\"], .ant-table')")
                             if in_table:
                                 continue
                             txt = (cand.inner_text() or "").strip().lower()
-                            # Strictly exclude Channel, Cha, Saluran, Live, Siaran
-                            if any(bad in txt for bad in ["channel", "cha", "saluran", "live", "siaran"]):
+                            # Strictly exclude Channel, Cha, Saluran, Live, Siaran, Pertumbuhan, Tingkat
+                            if any(bad in txt for bad in ["channel", "cha", "saluran", "live", "siaran", "pertumbuhan", "tingkat", "kategori", "dasar"]):
                                 continue
                             spk = cand
-                            logger.info("Found Sumber Pendapatan (Konten) trigger on sidebar", text=txt, x=box["x"], y=box["y"])
+                            logger.info("Found Sumber Pendapatan (Konten) trigger on sidebar", text=txt, x=box["x"], y=box["y"], h=box["height"])
                             break
                         except Exception:
                             continue
                     if spk:
                         break
                 except Exception as ex:
-                    logger.debug("Error finding revenue source trigger", term=term, error=str(ex))
+                    logger.debug("Error finding revenue source trigger", term=str(term), error=str(ex))
 
             if not spk or not spk.is_visible(timeout=1500):
                 cand = self.page.locator("div:has-text('Sumber Pendapatan'), div:has-text('Revenue Source')").first
                 if cand.is_visible(timeout=1000):
-                    spk = cand
+                    c_box = cand.bounding_box()
+                    if c_box and c_box["height"] <= 55:
+                        spk = cand
 
             if spk and spk.is_visible(timeout=1500):
                 spk.scroll_into_view_if_needed()
@@ -384,53 +396,60 @@ class KalodataNavigator:
                     except Exception:
                         continue
 
-                if video_opt and video_opt.is_visible(timeout=1500):
+                if not video_opt:
+                    logger.warning("Opened popover does NOT contain Video option, closing popover")
                     try:
-                        video_opt.click(force=True)
-                    except Exception:
-                        video_opt.evaluate("el => el.click()")
-                    self.page.wait_for_timeout(600)
-                    logger.info("Selected 'Video' in revenue source popover")
-
-                    # 4. Click OK / Apply button in popover if present
-                    for ok_loc in [
-                        popover.get_by_role("button", name=re.compile(r"^OK$|^Apply$|^Terapkan$", re.I)),
-                        popover.locator("button, [role='button'], .ant-btn, a").filter(has_text=re.compile(r"^OK$|^Apply$|^Terapkan$", re.I)),
-                        popover.get_by_text("OK", exact=True),
-                        self.page.locator(".ant-popover:not(.ant-popover-hidden)").locator("text=/^OK$|^Apply$/i")
-                    ]:
-                        try:
-                            btn = ok_loc.last
-                            if btn.is_visible(timeout=500):
-                                try:
-                                    btn.click(force=True)
-                                except Exception:
-                                    btn.evaluate("el => el.click()")
-                                self.page.wait_for_timeout(800)
-                                break
-                        except Exception:
-                            continue
-
-                    # 5. Click Submit / Kirim on left sidebar if enabled
-                    try:
-                        submit_btn = self.page.locator("button:has-text('Submit'), button:has-text('Kirim')").first
-                        if submit_btn.is_visible(timeout=800) and submit_btn.is_enabled():
-                            submit_btn.click(force=True)
-                            BaseScraper.pacing_page_delay()
-                            self.page.wait_for_timeout(1500)
+                        self.page.keyboard.press("Escape")
                     except Exception:
                         pass
+                    return "detail_breakdown"
 
-                    # 6. Close popover if still lingering
+                try:
+                    video_opt.click(force=True)
+                except Exception:
+                    video_opt.evaluate("el => el.click()")
+                self.page.wait_for_timeout(600)
+                logger.info("Selected 'Video' in revenue source popover")
+
+                # 4. Click OK / Apply button in popover if present
+                for ok_loc in [
+                    popover.get_by_role("button", name=re.compile(r"^OK$|^Apply$|^Terapkan$", re.I)),
+                    popover.locator("button, [role='button'], .ant-btn, a").filter(has_text=re.compile(r"^OK$|^Apply$|^Terapkan$", re.I)),
+                    popover.get_by_text("OK", exact=True),
+                    self.page.locator(".ant-popover:not(.ant-popover-hidden)").locator("text=/^OK$|^Apply$/i")
+                ]:
                     try:
-                        if popover.is_visible(timeout=400):
-                            self.page.keyboard.press("Escape")
-                            self.page.wait_for_timeout(400)
+                        btn = ok_loc.last
+                        if btn.is_visible(timeout=500):
+                            try:
+                                btn.click(force=True)
+                            except Exception:
+                                btn.evaluate("el => el.click()")
+                            self.page.wait_for_timeout(800)
+                            break
                     except Exception:
-                        pass
+                        continue
 
-                    logger.info("Revenue source filter 'Video' applied successfully via sidebar")
-                    return "product_filter"
+                # 5. Click Submit / Kirim on left sidebar if enabled
+                try:
+                    submit_btn = self.page.locator("button:has-text('Submit'), button:has-text('Kirim')").first
+                    if submit_btn.is_visible(timeout=800) and submit_btn.is_enabled():
+                        submit_btn.click(force=True)
+                        BaseScraper.pacing_page_delay()
+                        self.page.wait_for_timeout(1500)
+                except Exception:
+                    pass
+
+                # 6. Close popover if still lingering
+                try:
+                    if popover.is_visible(timeout=400):
+                        self.page.keyboard.press("Escape")
+                        self.page.wait_for_timeout(400)
+                except Exception:
+                    pass
+
+                logger.info("Revenue source filter 'Video' applied successfully via sidebar")
+                return "product_filter"
         except Exception as ex:
             logger.warning("Error applying revenue source filter via sidebar", error=str(ex))
 
@@ -457,29 +476,36 @@ class KalodataNavigator:
             # 1. Click Item Sold / Penjualan in left sidebar
             sales_trigger = None
 
-            # Pattern matches 'Item Sold' (English Kalodata UI), 'Penjualan' (Indonesian), or 'Sales'
-            sales_pattern = re.compile(r"Item Sold|Penjualan|Sales", re.I)
-
-            # Strategy 1: Find text element on left sidebar (x < 350, y > 60) outside table
-            try:
-                candidates = self.page.get_by_text(sales_pattern).all()
-                for cand in candidates:
-                    try:
-                        if not cand.is_visible(timeout=300):
+            # First priority: find exact leaf text matching "Penjualan" or "Item Sold"
+            for term in ["Penjualan", "Item Sold", "Sales"]:
+                try:
+                    cands = self.page.get_by_text(term, exact=True).all()
+                    if not cands:
+                        cands = self.page.get_by_text(re.compile(rf"^\s*{term}", re.I)).all()
+                    for cand in cands:
+                        try:
+                            if not cand.is_visible(timeout=300):
+                                continue
+                            box = cand.bounding_box()
+                            # Single menu item row must have height <= 55 and height >= 15 on sidebar (x < 350, y > 60)
+                            if not box or box["x"] > 350 or box["y"] < 60 or box["height"] > 55 or box["height"] < 15:
+                                continue
+                            in_table = cand.evaluate("el => !!el.closest('table, thead, th, tr, [role=\"table\"], [role=\"columnheader\"], .ant-table')")
+                            if in_table:
+                                continue
+                            txt = (cand.inner_text() or "").strip().lower()
+                            # Must NOT be an ancestor container containing other sections
+                            if any(bad in txt for bad in ["pertumbuhan", "tingkat", "sumber", "kategori", "dasar"]):
+                                continue
+                            sales_trigger = cand
+                            logger.info("Found Penjualan row trigger", text=txt, x=box["x"], y=box["y"], h=box["height"])
+                            break
+                        except Exception:
                             continue
-                        box = cand.bounding_box()
-                        if not box or box["x"] > 350 or box["y"] < 60:
-                            continue
-                        in_table = cand.evaluate("el => !!el.closest('table, thead, th, tr, [role=\"table\"], [role=\"columnheader\"], .ant-table')")
-                        if in_table:
-                            continue
-                        sales_trigger = cand
-                        logger.info("Found sales_trigger on sidebar", x=box["x"], y=box["y"])
+                    if sales_trigger:
                         break
-                    except Exception:
-                        continue
-            except Exception as ex:
-                logger.debug("Strategy 1 get_by_text error", error=str(ex))
+                except Exception as ex:
+                    logger.debug("Error searching sales trigger", term=term, error=str(ex))
 
             # Strategy 2: Relative XPath preceding 'Sumber Pendapatan' or 'Revenue Source'
             if not sales_trigger:
@@ -487,8 +513,10 @@ class KalodataNavigator:
                     prec_xpath = "//div[contains(., 'Sumber Pendapatan') or contains(., 'Revenue Source')]/preceding::*[contains(normalize-space(text()), 'Item Sold') or contains(normalize-space(text()), 'Penjualan') or contains(normalize-space(text()), 'Sales')][1]"
                     cand = self.page.locator(f"xpath={prec_xpath}").first
                     if cand.is_visible(timeout=1000):
-                        sales_trigger = cand
-                        logger.info("Found sales_trigger via preceding sibling XPath")
+                        box = cand.bounding_box()
+                        if box and box["height"] <= 55:
+                            sales_trigger = cand
+                            logger.info("Found sales_trigger via preceding sibling XPath")
                 except Exception as ex:
                     logger.debug("Strategy 2 preceding XPath error", error=str(ex))
 
@@ -516,9 +544,30 @@ class KalodataNavigator:
                     except Exception:
                         pass
 
-            # 2. Fill the Minimal and Maksimal input boxes inside the popover
             if not popover.is_visible(timeout=2000):
                 logger.warning("Sales popover did not appear after clicking Item Sold / Penjualan")
+                return False
+
+            # Verify that the popover genuinely belongs to Item Sold / Penjualan
+            is_sales_pop = False
+            for p_chk in [
+                popover.locator("input[placeholder*='Minimal'], input[placeholder*='Min']"),
+                popover.locator("text=/0 ~ 50|50 ~ 500/i"),
+                self.page.locator(".ant-popover:not(.ant-popover-hidden) input[placeholder*='Min']")
+            ]:
+                try:
+                    if p_chk.first.is_visible(timeout=500):
+                        is_sales_pop = True
+                        break
+                except Exception:
+                    continue
+
+            if not is_sales_pop:
+                logger.warning("Opened popover does NOT belong to Item Sold / Penjualan, closing")
+                try:
+                    self.page.keyboard.press("Escape")
+                except Exception:
+                    pass
                 return False
 
             inputs = popover.locator("input").all()

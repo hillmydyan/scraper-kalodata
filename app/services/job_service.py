@@ -618,23 +618,47 @@ class JobService:
         if headless is None:
             headless = True if sys.platform != "win32" else False
 
-        # Attempt Celery dispatch first
-        dispatched_to_celery = False
+        # Clear any stale profile lock before starting new execution
         try:
-            from app.tasks.celery_app import scrape_country_job
-            db = SessionLocal()
+            from app.scrapers.base import BaseScraper
+            BaseScraper.force_unlock("indo")
+        except Exception:
+            pass
+
+        # Fast socket check to verify Redis is actually reachable before calling Celery
+        redis_available = False
+        try:
+            import socket
+            from urllib.parse import urlparse
+            r_url = getattr(settings, "REDIS_URL", "redis://localhost:6379/0")
+            p = urlparse(r_url)
+            host = p.hostname or "127.0.0.1"
+            port = p.port or 6379
+            with socket.create_connection((host, port), timeout=0.15):
+                redis_available = True
+        except Exception:
+            redis_available = False
+
+        # Attempt Celery dispatch only if Redis is actively responding
+        dispatched_to_celery = False
+        if redis_available:
             try:
-                jobs = db.query(ScrapeJob).filter_by(run_id=run_id).order_by(ScrapeJob.created_at).all()
-                if jobs:
-                    for job in jobs:
-                        if job.status == "PENDING":
-                            scrape_country_job.delay(job.id, limit=limit, headless=headless)
-                    dispatched_to_celery = True
-                    logger.info("Dispatched jobs to Celery queue", run_id=run_id, count=len(jobs))
-            finally:
-                db.close()
-        except Exception as cel_err:
-            logger.warning("Celery dispatch unavailable, using background thread fallback", error=str(cel_err))
+                from app.tasks.celery_app import scrape_country_job
+                db = SessionLocal()
+                try:
+                    jobs = db.query(ScrapeJob).filter_by(run_id=run_id).order_by(ScrapeJob.created_at).all()
+                    if jobs:
+                        for job in jobs:
+                            if job.status == "PENDING":
+                                scrape_country_job.delay(job.id, limit=limit, headless=headless)
+                        dispatched_to_celery = True
+                        logger.info("Dispatched jobs to Celery queue", run_id=run_id, count=len(jobs))
+                finally:
+                    db.close()
+            except Exception as cel_err:
+                logger.warning("Celery dispatch unavailable, using background thread fallback", error=str(cel_err))
+        else:
+            logger.info("Redis server not active, launching jobs immediately via background thread")
 
         if not dispatched_to_celery:
             def worker_thread():
@@ -643,7 +667,11 @@ class JobService:
                     jobs = db.query(ScrapeJob).filter_by(run_id=run_id).order_by(ScrapeJob.created_at).all()
                     logger.info("Worker thread starting jobs execution", run_id=run_id, count=len(jobs))
                     for job in jobs:
-                        if job.status == "PENDING":
+                        if job.status in ("PENDING", "STARTING"):
+                            job.status = "RUNNING"
+                            job.stage = "STARTING"
+                            job.started_at = datetime.now(timezone.utc)
+                            db.commit()
                             cls.execute_job_now(job.id, limit=limit, headless=headless)
                     run = db.get(ScrapeRun, run_id)
                     if run:
