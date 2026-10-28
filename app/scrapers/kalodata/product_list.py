@@ -240,6 +240,14 @@ class ProductListScraper:
                             extracted["video_selection_method"] = detail_info.get("video_selection_method", "top_revenue")
                     except Exception as e:
                         logger.warning("Error fetching detail for row", error=str(e))
+                    finally:
+                        # Clean up any extra tabs/popups spawned by Kalodata interactions
+                        try:
+                            for p in self.page.context.pages:
+                                if p != self.page and p != detail_tab and not p.is_closed():
+                                    p.close()
+                        except Exception:
+                            pass
 
                 # Validate data (§6.10)
                 is_valid, reason = self._validate_row(extracted, min_sales=min_sales, max_sales=max_sales)

@@ -161,26 +161,24 @@ class ProductDetailScraper:
         4. first_listed
         5. none (NULL)
         """
-        # Look for 'Video & Ad' or 'Videos' tab
+        # Look for 'Video & Ad' or 'Videos' tab within tab containers
         try:
-            videos_tab = self.page.locator("div.flex:has-text('Video & Ad'), [role='tab']:has-text('Video'), text=/Video & Ad/i").first
+            videos_tab = self.page.locator(
+                ".ant-tabs-tab:has-text('Video'), "
+                "[role='tab']:has-text('Video'), "
+                "div[class*='tab']:has-text('Video')"
+            ).first
             if videos_tab.is_visible(timeout=1500):
                 videos_tab.click()
                 BaseScraper.pacing_detail_delay()
         except Exception:
-            try:
-                videos_link = self.page.locator("text=/Videos/i").first
-                if videos_link.is_visible(timeout=1000):
-                    videos_link.click()
-                    BaseScraper.pacing_detail_delay()
-            except Exception:
-                pass
+            pass
 
         # Check for video items or links
-        # Attempt 1: Sort by revenue/GMV if sort button exists
+        # Attempt 1: Sort by revenue/GMV if actual table column header sorter exists (NEVER click general text or links)
         try:
-            sort_btn = self.page.locator("text=/Revenue|GMV/i").first
-            if sort_btn.is_visible(timeout=1000):
+            sort_btn = self.page.locator("th.ant-table-column-has-sorters:has-text('Revenue'), th:has-text('GMV'), [role='columnheader']:has-text('Revenue')").first
+            if sort_btn.is_visible(timeout=800):
                 sort_btn.click()
                 BaseScraper.pacing_detail_delay()
                 video_url, url_type = self._find_first_video_link()
@@ -193,10 +191,10 @@ class ProductDetailScraper:
         except Exception:
             pass
 
-        # Attempt 2: Sort by sales if sort button exists
+        # Attempt 2: Sort by sales if actual table column header sorter exists (NEVER match arbitrary livestream/card text)
         try:
-            sort_sales = self.page.locator("text=/Sales/i").first
-            if sort_sales.is_visible(timeout=1000):
+            sort_sales = self.page.locator("th.ant-table-column-has-sorters:has-text('Sales'), [role='columnheader'] .ant-table-column-sorters:has-text('Sales')").first
+            if sort_sales.is_visible(timeout=800):
                 sort_sales.click()
                 BaseScraper.pacing_detail_delay()
                 video_url, url_type = self._find_first_video_link()
