@@ -367,27 +367,29 @@ class KalodataNavigator:
             # 1. Click Penjualan / Sales in left sidebar
             sales_trigger = None
 
-            # Strategy 1: Find text element strictly equal to "Penjualan" or "Sales" located in the sidebar (x < 350)
+            # Strategy 1: Find text element strictly equal to "Penjualan" or "Sales" outside table (pick leftmost)
             try:
                 candidates = self.page.get_by_text(re.compile(r"^\s*(Penjualan|Sales)\s*$", re.I)).all()
+                sidebar_cands = []
                 for cand in candidates:
                     try:
                         if not cand.is_visible(timeout=300):
                             continue
-                        box = cand.bounding_box()
-                        if box and box["x"] < 350 and box["y"] > 80:
-                            # Ensure element is not inside a table header or table body
-                            in_table = cand.evaluate("el => !!el.closest('table, thead, th, tr, [role=\"table\"], [role=\"columnheader\"]')")
-                            if not in_table:
-                                sales_trigger = cand
-                                logger.info("Found sales_trigger via get_by_text on sidebar", box=box)
-                                break
+                        in_table = cand.evaluate("el => !!el.closest('table, thead, th, tr, [role=\"table\"], [role=\"columnheader\"]')")
+                        if not in_table:
+                            box = cand.bounding_box()
+                            if box and box["y"] > 60:
+                                sidebar_cands.append((box["x"], cand))
                     except Exception:
                         continue
+                if sidebar_cands:
+                    sidebar_cands.sort(key=lambda item: item[0])
+                    sales_trigger = sidebar_cands[0][1]
+                    logger.info("Found sales_trigger via leftmost candidate on sidebar", x=sidebar_cands[0][0])
             except Exception as ex:
                 logger.debug("Strategy 1 get_by_text error", error=str(ex))
 
-            # Strategy 2: Relative XPath preceding 'Sumber Pendapatan' or 'Revenue Source'
+            # Strategy 2: Relative XPath preceding 'Sumber Pendapatan'
             if not sales_trigger:
                 try:
                     prec_xpath = "//div[contains(., 'Sumber Pendapatan') or contains(., 'Revenue Source')]/preceding::*[normalize-space(text())='Penjualan' or normalize-space(text())='Sales'][1]"
@@ -398,17 +400,20 @@ class KalodataNavigator:
                 except Exception as ex:
                     logger.debug("Strategy 2 preceding XPath error", error=str(ex))
 
-            # Strategy 3: Normalized text XPath not in table with x < 350
+            # Strategy 3: Normalized text XPath not in table (pick leftmost)
             if not sales_trigger:
                 try:
                     xp = "//*[not(ancestor-or-self::table or ancestor-or-self::thead or ancestor-or-self::th or ancestor-or-self::tr)][normalize-space(text())='Penjualan' or normalize-space(text())='Sales']"
+                    xpath_cands = []
                     for cand in self.page.locator(f"xpath={xp}").all():
                         if cand.is_visible(timeout=300):
                             box = cand.bounding_box()
-                            if box and box["x"] < 350 and box["y"] > 80:
-                                sales_trigger = cand
-                                logger.info("Found sales_trigger via XPath outside table", box=box)
-                                break
+                            if box and box["y"] > 60:
+                                xpath_cands.append((box["x"], cand))
+                    if xpath_cands:
+                        xpath_cands.sort(key=lambda item: item[0])
+                        sales_trigger = xpath_cands[0][1]
+                        logger.info("Found sales_trigger via XPath outside table", x=xpath_cands[0][0])
                 except Exception as ex:
                     logger.debug("Strategy 3 XPath error", error=str(ex))
 
@@ -425,11 +430,16 @@ class KalodataNavigator:
             popover = self.page.locator(".ant-popover:not(.ant-popover-hidden), div[role='tooltip']:not([aria-hidden='true'])").last
             if not popover.is_visible(timeout=1000):
                 logger.info("Popover not immediately visible, attempting click on parent row container...")
-                parent_row = sales_trigger.locator("xpath=ancestor::div[contains(@class, 'item') or contains(@class, 'flex') or contains(@class, 'trigger') or contains(@class, 'ant-')][1]")
-                if parent_row.is_visible(timeout=500):
-                    parent_row.click(force=True)
-                    self.page.wait_for_timeout(800)
-                    popover = self.page.locator(".ant-popover:not(.ant-popover-hidden), div[role='tooltip']:not([aria-hidden='true'])").last
+                for p_loc in [sales_trigger.locator(".."), sales_trigger.locator("../..")]:
+                    try:
+                        if p_loc.is_visible(timeout=400):
+                            p_loc.click(force=True)
+                            self.page.wait_for_timeout(800)
+                            popover = self.page.locator(".ant-popover:not(.ant-popover-hidden), div[role='tooltip']:not([aria-hidden='true'])").last
+                            if popover.is_visible(timeout=500):
+                                break
+                    except Exception:
+                        pass
 
             # 2. Fill the inputs inside visible popover
             if not popover.is_visible(timeout=2000):
