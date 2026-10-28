@@ -570,56 +570,58 @@ class KalodataNavigator:
                     pass
                 return False
 
-            inputs = popover.locator("input").all()
-            if not inputs:
+            all_inputs = popover.locator("input").all()
+            if not all_inputs:
                 logger.warning("No input elements found in sales popover")
                 return False
 
             # First input: Minimal sales
-            min_input = inputs[0]
+            min_input = all_inputs[0]
             min_input.click()
-            min_input.fill("")
             min_input.press("Control+A")
             min_input.press("Backspace")
+            min_input.fill("")
             if min_sales and min_sales > 0:
                 min_input.fill(str(min_sales))
                 try:
-                    min_input.press_sequentially(str(min_sales), delay=20)
+                    min_input.dispatch_event("input")
+                    min_input.dispatch_event("change")
+                    min_input.dispatch_event("blur")
                 except Exception:
                     pass
                 try:
-                    min_input.dispatch_event("input")
-                    min_input.dispatch_event("change")
+                    if min_input.input_value() != str(min_sales):
+                        min_input.fill(str(min_sales))
                 except Exception:
                     pass
             self.page.wait_for_timeout(300)
 
-            # Second input: Maksimal sales (if available)
-            if len(inputs) >= 2:
-                max_input = inputs[1]
-                max_input.click()
-                max_input.fill("")
-                max_input.press("Control+A")
-                max_input.press("Backspace")
+            # Second input: Maksimal sales (if provided)
+            max_input = all_inputs[1] if len(all_inputs) >= 2 else None
+            if max_input and max_input.is_visible(timeout=300):
                 if max_sales and max_sales > 0:
+                    max_input.click()
+                    max_input.press("Control+A")
+                    max_input.press("Backspace")
                     max_input.fill(str(max_sales))
-                    try:
-                        max_input.press_sequentially(str(max_sales), delay=20)
-                    except Exception:
-                        pass
                     try:
                         max_input.dispatch_event("input")
                         max_input.dispatch_event("change")
+                        max_input.dispatch_event("blur")
+                    except Exception:
+                        pass
+                else:
+                    try:
+                        if max_input.input_value():
+                            max_input.click()
+                            max_input.press("Control+A")
+                            max_input.press("Backspace")
+                            max_input.fill("")
+                            max_input.dispatch_event("input")
+                            max_input.dispatch_event("change")
                     except Exception:
                         pass
                 self.page.wait_for_timeout(300)
-
-            # Press Enter on min_input to trigger React form update
-            try:
-                min_input.press("Enter")
-                self.page.wait_for_timeout(400)
-            except Exception:
-                pass
 
             # 3. Click blue 'OK' button inside the popover
             ok_clicked = False
