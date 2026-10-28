@@ -140,3 +140,75 @@ class TestKalodataNavigatorSalesFilter:
         submit_btn.click.assert_called_once()
 
 
+class TestKalodataNavigatorRevenueFilter:
+    def test_apply_revenue_source_filter_already_active(self):
+        page = MagicMock()
+        video_badge = MagicMock()
+        video_badge.is_visible.return_value = True
+        video_badge.bounding_box.return_value = {"x": 100, "y": 200, "width": 50, "height": 20}
+
+        mock_loc = MagicMock()
+        mock_loc.filter.return_value.all.return_value = [video_badge]
+        page.locator.return_value = mock_loc
+
+        nav = KalodataNavigator(page)
+        res = nav.apply_revenue_source_filter()
+        assert res == "product_filter"
+
+    def test_apply_revenue_source_filter_clicks_video_and_ok(self):
+        page = MagicMock()
+
+        # Trigger
+        cand = MagicMock()
+        cand.is_visible.return_value = True
+        cand.bounding_box.return_value = {"x": 100, "y": 250, "width": 80, "height": 30}
+        cand.inner_text.return_value = "Sumber Pendapatan(Konten)"
+        cand.evaluate.return_value = False
+        page.get_by_text.return_value.all.return_value = [cand]
+
+        popover = MagicMock()
+        popover.is_visible.return_value = True
+        video_opt = MagicMock()
+        video_opt.is_visible.return_value = True
+        ok_btn = MagicMock()
+        ok_btn.is_visible.return_value = True
+        submit_btn = MagicMock()
+        submit_btn.is_visible.return_value = True
+        submit_btn.is_enabled.return_value = True
+
+        def page_loc_side_effect(selector):
+            mock = MagicMock()
+            if "ant-popover" in selector:
+                mock.last = popover
+            elif "button:has-text('Submit')" in selector or "button:has-text('Kirim')" in selector:
+                mock.first = submit_btn
+            else:
+                mock.filter.return_value.all.return_value = []
+                mock.first = MagicMock(is_visible=lambda timeout=None: False)
+                mock.last = MagicMock(is_visible=lambda timeout=None: False)
+            return mock
+
+        def popover_loc_side_effect(selector):
+            mock = MagicMock()
+            if "Video" in selector:
+                mock.first = video_opt
+            elif "OK" in selector:
+                mock.last = ok_btn
+            else:
+                mock.first = MagicMock(is_visible=lambda timeout=None: False)
+                mock.last = MagicMock(is_visible=lambda timeout=None: False)
+            return mock
+
+        page.locator.side_effect = page_loc_side_effect
+        popover.locator.side_effect = popover_loc_side_effect
+        popover.get_by_text.return_value.first = video_opt
+        popover.get_by_role.return_value.last = ok_btn
+
+        nav = KalodataNavigator(page)
+        res = nav.apply_revenue_source_filter()
+        assert res == "product_filter"
+        cand.click.assert_called_once()
+        video_opt.click.assert_called_once()
+
+
+
