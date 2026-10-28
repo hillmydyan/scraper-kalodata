@@ -94,6 +94,28 @@ class TestProductListScraperSalesThreshold:
         assert valid is False
         assert reason == "SALES_BELOW_MIN_50"
 
+    def test_validate_row_with_min_and_max_sales(self):
+        page = MagicMock()
+        scraper = ProductListScraper(page, "ID")
+
+        # Range 50 ~ 10000:
+        # 5000 passes
+        valid, _ = scraper._validate_row({
+            "source_product_id": "123",
+            "product_name": "Test Item",
+            "sales_value": 5000
+        }, min_sales=50, max_sales=10000)
+        assert valid is True
+
+        # 12000 fails (exceeds max 10000)
+        valid, reason = scraper._validate_row({
+            "source_product_id": "123",
+            "product_name": "Test Item",
+            "sales_value": 12000
+        }, min_sales=50, max_sales=10000)
+        assert valid is False
+        assert reason == "SALES_ABOVE_MAX_10000"
+
 
 class TestJobServiceMinProductSales:
     def test_get_min_product_sales_default(self):
@@ -109,8 +131,16 @@ class TestJobServiceMinProductSales:
         db.get.return_value = Setting(key="min_product_sales", value=80)
         assert JobService.get_min_product_sales(db) == 80
 
-    def test_create_daily_run_persists_custom_min_sales(self):
+    def test_get_max_product_sales_from_db(self):
+        from app.services.job_service import JobService
+        from app.models.entities import Setting
+        db = MagicMock()
+        db.get.return_value = Setting(key="max_product_sales", value=10000)
+        assert JobService.get_max_product_sales(db) == 10000
+
+    def test_create_daily_run_persists_custom_min_and_max_sales(self):
         from app.services.job_service import JobService
         db = MagicMock()
-        run = JobService.create_daily_run(db, trigger="manual", min_sales=75)
+        run = JobService.create_daily_run(db, trigger="manual", min_sales=75, max_sales=5000)
         assert run.summary["min_sales"] == 75
+        assert run.summary["max_sales"] == 5000

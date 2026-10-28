@@ -36,7 +36,8 @@ def index():
             "max_products": settings.MAX_PRODUCTS_PER_COUNTRY,
             "readiness_hour": settings.READINESS_DEADLINE_HOUR_WIB,
             "webhook_url": settings.WEBHOOK_URL or "",
-            "min_product_sales": JobService.get_min_product_sales(db)
+            "min_product_sales": JobService.get_min_product_sales(db),
+            "max_product_sales": JobService.get_max_product_sales(db)
         }
 
         return render_template(
@@ -88,26 +89,48 @@ def update_retention():
 @admin_required
 def update_min_sales():
     min_sales_str = request.form.get("min_product_sales", "150")
+    max_sales_str = request.form.get("max_product_sales", "")
     try:
         min_sales = max(1, int(min_sales_str))
     except (ValueError, TypeError):
         min_sales = 150
 
+    max_sales = None
+    if max_sales_str and max_sales_str.strip():
+        try:
+            val = int(max_sales_str)
+            if val > 0:
+                max_sales = val
+        except (ValueError, TypeError):
+            pass
+
     db = SessionLocal()
     try:
-        st = db.get(Setting, "min_product_sales")
-        if not st:
-            st = Setting(key="min_product_sales", value=min_sales, updated_by=current_user.username)
-            db.add(st)
+        st_min = db.get(Setting, "min_product_sales")
+        if not st_min:
+            st_min = Setting(key="min_product_sales", value=min_sales, updated_by=current_user.username)
+            db.add(st_min)
         else:
-            st.value = min_sales
-            st.updated_by = current_user.username
-            st.updated_at = datetime.now(timezone.utc)
-            flag_modified(st, "value")
+            st_min.value = min_sales
+            st_min.updated_by = current_user.username
+            st_min.updated_at = datetime.now(timezone.utc)
+            flag_modified(st_min, "value")
+
+        st_max = db.get(Setting, "max_product_sales")
+        if not st_max:
+            st_max = Setting(key="max_product_sales", value=max_sales, updated_by=current_user.username)
+            db.add(st_max)
+        else:
+            st_max.value = max_sales
+            st_max.updated_by = current_user.username
+            st_max.updated_at = datetime.now(timezone.utc)
+            flag_modified(st_max, "value")
+
         db.commit()
 
+        range_desc = f"{min_sales} s/d {max_sales} pcs" if max_sales else f"minimal {min_sales} pcs"
         flash(
-            f"Batas minimal penjualan produk berhasil diperbarui menjadi {min_sales} pcs terjual!",
+            f"Rentang penjualan produk berhasil diperbarui menjadi {range_desc}!",
             "success"
         )
     finally:

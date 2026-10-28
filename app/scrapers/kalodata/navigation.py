@@ -347,15 +347,15 @@ class KalodataNavigator:
         logger.info("Revenue source filter not on product list, using detail_breakdown fallback")
         return "detail_breakdown"
 
-    def apply_sales_filter(self, min_sales: Optional[int]) -> bool:
+    def apply_sales_filter(self, min_sales: Optional[int], max_sales: Optional[int] = None) -> bool:
         """
-        Applies 'Penjualan >= min_sales' filter on Kalodata sidebar (§6.10).
-        Fills the 'Penjualan' / 'Sales' minimum input and submits.
+        Applies 'Penjualan' filter on Kalodata sidebar (§6.10).
+        Fills the 'Penjualan' / 'Sales' minimum input and optional maximum input, then submits.
         """
-        if not min_sales or min_sales <= 0:
+        if (not min_sales or min_sales <= 0) and (not max_sales or max_sales <= 0):
             return False
 
-        logger.info("Applying sales filter on Kalodata sidebar", min_sales=min_sales)
+        logger.info("Applying sales filter on Kalodata sidebar", min_sales=min_sales, max_sales=max_sales)
         self.dismiss_overlays()
 
         try:
@@ -401,18 +401,18 @@ class KalodataNavigator:
                         min_input = inputs[0]
                         min_input.click()
                         min_input.fill("")
-                        min_input.fill(str(min_sales))
+                        if min_sales and min_sales > 0:
+                            min_input.fill(str(min_sales))
                         self.page.wait_for_timeout(400)
 
-                        # If there is a second input (Max) and it's less than min_sales, clear it
+                        # Second input is the 'Max' sales value (e.g. 10000)
                         if len(inputs) >= 2:
                             max_input = inputs[1]
-                            try:
-                                max_val = max_input.input_value()
-                                if max_val and int(max_val) < min_sales:
-                                    max_input.fill("")
-                            except Exception:
-                                pass
+                            max_input.click()
+                            max_input.fill("")
+                            if max_sales and max_sales > 0:
+                                max_input.fill(str(max_sales))
+                            self.page.wait_for_timeout(400)
 
                     # 3. Click blue OK button in popover
                     ok_btn = popover.locator("button:has-text('OK'), button.ant-btn-primary, button:has-text('Apply')").last
@@ -427,7 +427,7 @@ class KalodataNavigator:
                         BaseScraper.pacing_page_delay()
                         self.page.wait_for_timeout(2000)
 
-                    logger.info("Sales filter applied successfully on Kalodata sidebar", min_sales=min_sales)
+                    logger.info("Sales filter applied successfully on Kalodata sidebar", min_sales=min_sales, max_sales=max_sales)
                     return True
         except Exception as ex:
             logger.warning("Error applying sales filter on sidebar", error=str(ex))

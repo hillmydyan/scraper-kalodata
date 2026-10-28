@@ -63,25 +63,28 @@
         {{ icon('server', 20, color='var(--color-primary)') }}
         <h2 class="card-title" style="margin: 0;">Batas &amp; Parameter Scraper</h2>
       </div>
-      <span class="badge" style="background: rgba(37, 99, 235, 0.1); color: var(--color-primary); font-weight: 700; font-size: 0.75rem; padding: 0.2rem 0.5rem; border-radius: 4px;">Min. Penjualan: &ge; {{ settings.min_product_sales }} Pcs</span>
+      <span class="badge" style="background: rgba(37, 99, 235, 0.1); color: var(--color-primary); font-weight: 700; font-size: 0.75rem; padding: 0.2rem 0.5rem; border-radius: 4px;">Penjualan: {% if settings.max_product_sales %}{{ settings.min_product_sales }} &mdash; {{ settings.max_product_sales }}{% else %}&ge; {{ settings.min_product_sales }}{% endif %} Pcs</span>
     </div>
 
     <!-- Form Ubah Batas Penjualan Produk -->
     <form method="POST" action="{{ url_for('settings.update_min_sales') }}" style="margin-bottom: 1rem; background: #F8FAFC; border: 1px solid var(--color-border-subtle); border-radius: 8px; padding: 0.75rem;">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
       <label style="display: block; font-size: 0.8rem; font-weight: 700; color: var(--color-sidebar); margin-bottom: 0.35rem;">
-        Minimal Penjualan Produk (Filter Katalog):
+        Rentang Penjualan Produk (Filter Katalog Kalodata):
       </label>
-      <div style="display: flex; gap: 0.5rem; align-items: center;">
+      <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
         <input type="number" name="min_product_sales" value="{{ settings.min_product_sales }}" min="1" max="100000" required
-               class="form-control" style="width: 100px; padding: 0.4rem 0.6rem; font-size: 0.88rem; font-weight: 700; text-align: center;">
+               class="form-control" style="width: 100px; padding: 0.4rem 0.6rem; font-size: 0.88rem; font-weight: 700; text-align: center;" placeholder="Min">
+        <span style="font-weight: 700; color: var(--color-text-muted);">&mdash;</span>
+        <input type="number" name="max_product_sales" value="{{ settings.max_product_sales or '' }}" min="1" max="1000000"
+               class="form-control" style="width: 120px; padding: 0.4rem 0.6rem; font-size: 0.88rem; font-weight: 700; text-align: center;" placeholder="Max (Opsional)">
         <span style="font-size: 0.85rem; color: var(--color-text-muted);">Pcs Terjual</span>
         <button type="submit" class="btn btn-primary" style="margin-left: auto; padding: 0.4rem 0.85rem; font-size: 0.8rem; display: flex; align-items: center; gap: 0.3rem;">
           {{ icon('check', 14, stroke=2.5) }} Simpan
         </button>
       </div>
       <span style="display: block; font-size: 0.75rem; color: var(--color-text-muted); margin-top: 0.3rem;">
-        Hanya produk dengan penjualan minimal angka ini (&ge;) yang akan ditarik dan diekspor.
+        Mengatur rentang Min &mdash; Max pada filter popover Penjualan Kalodata. Kosongkan Max jika tanpa batas atas.
       </span>
     </form>
 

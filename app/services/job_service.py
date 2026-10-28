@@ -35,6 +35,18 @@ class JobService:
         return getattr(settings, "MIN_PRODUCT_SALES", 150)
 
     @staticmethod
+    def get_max_product_sales(db: Session) -> Optional[int]:
+        """Gets the configured maximum product sales threshold (or None if unconstrained)."""
+        try:
+            st = db.get(Setting, "max_product_sales")
+            if st and st.value is not None:
+                v = int(st.value)
+                return v if v > 0 else None
+        except Exception:
+            pass
+        return None
+
+    @staticmethod
     def create_daily_run(
         db: Session,
         period_date: Optional[date] = None,
@@ -42,7 +54,8 @@ class JobService:
         created_by: Optional[str] = "system",
         countries: Optional[List[str]] = None,
         module: str = "product",
-        min_sales: Optional[int] = None
+        min_sales: Optional[int] = None,
+        max_sales: Optional[int] = None
     ) -> ScrapeRun:
         """Creates a ScrapeRun and child ScrapeJob records for specified countries or ID, MY, TH."""
         if period_date is None:
@@ -51,6 +64,7 @@ class JobService:
 
         target_countries = countries if countries else ["ID", "MY", "TH"]
         effective_min_sales = min_sales if min_sales is not None else JobService.get_min_product_sales(db)
+        effective_max_sales = max_sales if max_sales is not None else JobService.get_max_product_sales(db)
 
         run = ScrapeRun(
             id=str(uuid.uuid4()),
@@ -60,7 +74,12 @@ class JobService:
             status="RUNNING",
             started_at=datetime.now(timezone.utc),
             created_by=created_by,
-            summary={"countries": target_countries, "module": module, "min_sales": effective_min_sales}
+            summary={
+                "countries": target_countries,
+                "module": module,
+                "min_sales": effective_min_sales,
+                "max_sales": effective_max_sales
+            }
         )
         db.add(run)
 
@@ -477,7 +496,7 @@ class JobService:
                     db.commit()
                     nav.apply_category_filter(job.country_code)
 
-                    # Determine minimum product sales threshold
+                    # Determine minimum & maximum product sales threshold
                     is_manual = (job.run.trigger == "manual") if job.run else False
                     effective_max = limit if (is_manual and limit and limit > 0) else None
                     if job.run and isinstance(job.run.summary, dict) and job.run.summary.get("min_sales") is not None:
@@ -488,14 +507,22 @@ class JobService:
                     else:
                         min_sales = cls.get_min_product_sales(db)
 
+                    if job.run and isinstance(job.run.summary, dict) and job.run.summary.get("max_sales") is not None:
+                        try:
+                            max_sales = int(job.run.summary["max_sales"])
+                        except (ValueError, TypeError):
+                            max_sales = cls.get_max_product_sales(db)
+                    else:
+                        max_sales = cls.get_max_product_sales(db)
+
                     # Step 5: Revenue Source
                     job.stage = "FILTERING_REVENUE"
                     db.commit()
                     rev_method = nav.apply_revenue_source_filter()
 
-                    # Step 5b: Apply Minimum Sales Filter on Kalodata sidebar
-                    if min_sales and min_sales > 0:
-                        nav.apply_sales_filter(min_sales)
+                    # Step 5b: Apply Sales Filter on Kalodata sidebar
+                    if (min_sales and min_sales > 0) or (max_sales and max_sales > 0):
+                        nav.apply_sales_filter(min_sales, max_sales=max_sales)
 
                     # Step 6: Scraping Product List & Detail
                     job.stage = "SCRAPING_PRODUCTS"
@@ -514,6 +541,7 @@ class JobService:
                     scrape_res = list_scraper.scrape_products(
                         max_limit=effective_max,
                         min_sales=min_sales,
+                        max_sales=max_sales,
                         checkpoint_cb=checkpoint_cb,
                         cancel_check_cb=cancel_check,
                         revenue_source_method=rev_method

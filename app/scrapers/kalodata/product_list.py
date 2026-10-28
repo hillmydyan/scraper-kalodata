@@ -36,6 +36,7 @@ class ProductListScraper:
         self,
         max_limit: Optional[int] = 2000,
         min_sales: Optional[int] = 150,
+        max_sales: Optional[int] = None,
         checkpoint_cb: Optional[Callable[[List[Dict[str, Any]], int], None]] = None,
         cancel_check_cb: Optional[Callable[[], bool]] = None,
         revenue_source_method: str = "product_filter"
@@ -190,6 +191,23 @@ class ProductListScraper:
                             break
                         continue
 
+                # Filter products with sales > max_sales (if upper bound specified)
+                if max_sales is not None and max_sales > 0 and sales_val is not None and sales_val > max_sales:
+                    rejected.append({
+                        "row_index": total_scanned,
+                        "reason": f"SALES_ABOVE_MAX_{max_sales}",
+                        "raw": extracted
+                    })
+                    consecutive_rejects += 1
+                    logger.info(
+                        "Skipping product with sales > max_sales",
+                        sales=sales_val,
+                        raw_sales=extracted.get("sales_raw"),
+                        max_sales=max_sales,
+                        product_name=extracted.get("product_name")
+                    )
+                    continue
+
                 # Open detail tab to select 1 video and extract video breakdown
                 if extracted.get("product_url"):
                     try:
@@ -224,7 +242,7 @@ class ProductListScraper:
                         logger.warning("Error fetching detail for row", error=str(e))
 
                 # Validate data (§6.10)
-                is_valid, reason = self._validate_row(extracted, min_sales=min_sales)
+                is_valid, reason = self._validate_row(extracted, min_sales=min_sales, max_sales=max_sales)
                 if not is_valid:
                     rejected.append({
                         "row_index": total_scanned,
@@ -445,7 +463,12 @@ class ProductListScraper:
             logger.warning("Error parsing table row", error=str(e))
             return None
 
-    def _validate_row(self, row: Dict[str, Any], min_sales: Optional[int] = 150) -> Tuple[bool, str]:
+    def _validate_row(
+        self,
+        row: Dict[str, Any],
+        min_sales: Optional[int] = 150,
+        max_sales: Optional[int] = None
+    ) -> Tuple[bool, str]:
         """Validates row according to PRD §6.10."""
         if not row.get("source_product_id"):
             return False, "MISSING_PRODUCT_ID"
@@ -461,6 +484,8 @@ class ProductListScraper:
             return False, "INVALID_SALES_NEGATIVE"
         if min_sales is not None and (sales is None or sales < min_sales):
             return False, f"SALES_BELOW_MIN_{min_sales}"
+        if max_sales is not None and max_sales > 0 and (sales is not None and sales > max_sales):
+            return False, f"SALES_ABOVE_MAX_{max_sales}"
 
         comm = row.get("commission_rate")
         if comm is not None and (comm < 0.0 or comm > 1.0):

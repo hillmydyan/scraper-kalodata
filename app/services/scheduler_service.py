@@ -131,6 +131,7 @@ class SchedulerService:
                         db_init = SessionLocal()
                         try:
                             min_s = JobService.get_min_product_sales(db_init) if mod == "product" else None
+                            max_s = JobService.get_max_product_sales(db_init) if mod == "product" else None
                             run = JobService.create_daily_run(
                                 db_init,
                                 period_date=yesterday,
@@ -138,7 +139,8 @@ class SchedulerService:
                                 created_by="auto_scheduler",
                                 countries=target_countries,
                                 module=mod,
-                                min_sales=min_s
+                                min_sales=min_s,
+                                max_sales=max_s
                             )
                             db_init.commit()
                             run_id = run.id
@@ -173,6 +175,7 @@ class SchedulerService:
                 return "Started sequential scheduled runs for creator and product"
             else:
                 min_s = JobService.get_min_product_sales(db) if module == "product" else None
+                max_s = JobService.get_max_product_sales(db) if module == "product" else None
                 run = JobService.create_daily_run(
                     db,
                     period_date=yesterday,
@@ -180,7 +183,8 @@ class SchedulerService:
                     created_by="auto_scheduler",
                     countries=target_countries,
                     module=module,
-                    min_sales=min_s
+                    min_sales=min_s,
+                    max_sales=max_s
                 )
                 db.commit()
 

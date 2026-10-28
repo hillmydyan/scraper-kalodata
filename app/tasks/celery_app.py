@@ -89,7 +89,14 @@ def run_daily_pipeline():
 
         # 2. Create ScrapeRun
         yesterday = date.today() - timedelta(days=1)
-        run = JobService.create_daily_run(db, period_date=yesterday, trigger="scheduled", created_by="celery_beat")
+        run = JobService.create_daily_run(
+            db,
+            period_date=yesterday,
+            trigger="scheduled",
+            created_by="celery_beat",
+            min_sales=JobService.get_min_product_sales(db),
+            max_sales=JobService.get_max_product_sales(db)
+        )
 
         # 3. Serial scrape per country
         countries = ["ID", "MY", "TH"]

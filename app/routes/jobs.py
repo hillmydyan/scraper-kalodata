@@ -69,6 +69,7 @@ def index():
             }
 
         min_product_sales = JobService.get_min_product_sales(db)
+        max_product_sales = JobService.get_max_product_sales(db)
         return render_template(
             "jobs/index.html",
             jobs=jobs,
@@ -76,6 +77,7 @@ def index():
             schedule_config=schedule_config,
             manual_config=manual_config,
             min_product_sales=min_product_sales,
+            max_product_sales=max_product_sales,
             format_wib=format_wib
         )
     finally:
@@ -130,7 +132,7 @@ def save_schedule():
 
         db.commit()
 
-        # Update min_product_sales if provided
+        # Update min_product_sales and max_product_sales if provided
         min_sales_input = request.form.get("min_product_sales")
         if min_sales_input:
             try:
@@ -147,6 +149,26 @@ def save_schedule():
                 db.commit()
             except (ValueError, TypeError):
                 pass
+
+        max_sales_input = request.form.get("max_product_sales")
+        st_max = db.get(Setting, "max_product_sales")
+        max_sales_val = None
+        if max_sales_input and max_sales_input.strip():
+            try:
+                mv = int(max_sales_input)
+                if mv > 0:
+                    max_sales_val = mv
+            except (ValueError, TypeError):
+                pass
+        if not st_max:
+            st_max = Setting(key="max_product_sales", value=max_sales_val, updated_by=current_user.username)
+            db.add(st_max)
+        else:
+            st_max.value = max_sales_val
+            st_max.updated_by = current_user.username
+            st_max.updated_at = datetime.now(timezone.utc)
+            flag_modified(st_max, "value")
+        db.commit()
 
         # Ensure scheduler thread is running and reset trigger cache
         from app.services.scheduler_service import SchedulerService
@@ -203,6 +225,16 @@ def trigger_manual():
         except (ValueError, TypeError):
             min_sales = JobService.get_min_product_sales(db)
 
+        max_sales_str = request.form.get("max_sales")
+        max_sales = None
+        if max_sales_str and max_sales_str.strip():
+            try:
+                mv = int(max_sales_str)
+                if mv > 0:
+                    max_sales = mv
+            except (ValueError, TypeError):
+                pass
+
         # Persist the user's manual configuration so it never reverts to 20
         from sqlalchemy.orm.attributes import flag_modified
         manual_data = {
@@ -211,7 +243,8 @@ def trigger_manual():
             "country": country,
             "headless": headless_str,
             "period": period_str,
-            "min_sales": min_sales
+            "min_sales": min_sales,
+            "max_sales": max_sales
         }
         manual_setting = db.get(Setting, "manual_config")
         if not manual_setting:
@@ -231,7 +264,8 @@ def trigger_manual():
             created_by=current_user.username,
             countries=target_countries,
             module=module,
-            min_sales=min_sales
+            min_sales=min_sales,
+            max_sales=max_sales
         )
 
         # Dispatch background execution immediately
