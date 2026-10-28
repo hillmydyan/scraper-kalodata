@@ -105,13 +105,13 @@
       </div>
 
       <div class="form-group">
-        <label class="form-label">Rentang Penjualan Produk (Min &mdash; Max Pcs)</label>
-        <div style="display: flex; align-items: center; gap: 0.4rem;">
-          <input type="number" id="schedule_min_sales" name="min_product_sales" value="{{ min_product_sales }}" min="1" max="100000" class="form-input" style="font-weight: 700; width: 48%;" placeholder="Min (mis. 50)" required>
-          <span style="font-weight: 700; color: var(--color-text-muted);">&mdash;</span>
-          <input type="number" id="schedule_max_sales" name="max_product_sales" value="{{ max_product_sales or '' }}" min="1" max="1000000" class="form-input" style="font-weight: 700; width: 48%;" placeholder="Max (Opsional)">
+        <label class="form-label">Minimal Penjualan Produk</label>
+        <div style="padding: 0.5rem 0.75rem; background: #F1F5F9; border: 1px solid var(--color-border-subtle); border-radius: 6px; font-weight: 700; color: var(--color-text-heading); font-size: 0.88rem; display: flex; align-items: center; justify-content: space-between;">
+          <span>50 Pcs (Standar Tetap Kalodata)</span>
+          <span class="badge badge-success" style="font-size: 0.72rem;">Otomatis</span>
         </div>
-        <div class="field-hint">Mengisi filter popover Penjualan di Kalodata secara otomatis. Max opsional.</div>
+        <div class="field-hint">Otomatis mengisi filter Minimal 50 pcs di Kalodata.</div>
+        <input type="hidden" name="min_product_sales" value="50">
       </div>
     </div>
 
@@ -120,8 +120,7 @@
       <div style="display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;">
         <span style="font-weight: 700; color: var(--color-text-heading);">Kriteria Minimum:</span>
         <span style="color: var(--color-success); font-weight: 700;">{{ icon('check', 14, stroke=2.5) }} Kreator: Pendapatan &ge; Rp50.000.000 (MY: RM14.000, TH: ฿110.000)</span>
-        <span style="color: var(--color-success); font-weight: 700;">{{ icon('check', 14, stroke=2.5) }} Produk: Penjualan {% if max_product_sales %}{{ min_product_sales }} &mdash; {{ max_product_sales }}{% else %}&ge; {{ min_product_sales }}{% endif %} Terjual</span>
-        <a href="{{ url_for('settings.index') }}" style="font-size: 0.76rem; color: var(--color-primary); text-decoration: underline; margin-left: -0.4rem;">(Ubah Pengaturan)</a>
+        <span style="color: var(--color-success); font-weight: 700;">{{ icon('check', 14, stroke=2.5) }} Produk: Penjualan &ge; 50 Terjual</span>
       </div>
       <span style="color: var(--color-text-muted); font-size: 0.78rem;">Sistem otomatis menyaring data tanpa batas kuota.</span>
       <input type="hidden" id="target_limit" name="target_limit" value="{{ schedule_config.target_limit or 2000 }}">
@@ -203,19 +202,19 @@
     <!-- Row 2: Runtime, Limit & Sales Filter -->
     <div class="form-grid-3" style="margin-top: 0.5rem;">
       <div class="form-group">
-        <label class="form-label">Rentang Penjualan Produk (Pcs)</label>
-        <div style="display: flex; align-items: center; gap: 0.4rem;">
-          <input type="number" id="manual_min_sales" name="min_sales" value="{{ (manual_config or {}).get('min_sales') or min_product_sales }}" min="1" max="100000" class="form-input" style="font-weight: 700; width: 48%;" placeholder="Min (mis. 50)" required>
-          <span style="font-weight: 700; color: var(--color-text-muted);">&mdash;</span>
-          <input type="number" id="manual_max_sales" name="max_sales" value="{{ (manual_config or {}).get('max_sales') or (max_product_sales or '') }}" min="1" max="1000000" class="form-input" style="font-weight: 700; width: 48%;" placeholder="Max (Opsional)">
+        <label class="form-label">Minimal Penjualan Produk</label>
+        <div style="padding: 0.5rem 0.75rem; background: #F1F5F9; border: 1px solid var(--color-border-subtle); border-radius: 6px; font-weight: 700; color: var(--color-text-heading); font-size: 0.88rem; display: flex; align-items: center; justify-content: space-between;">
+          <span>50 Pcs (Standar Tetap Kalodata)</span>
+          <span class="badge badge-success" style="font-size: 0.72rem;">Otomatis</span>
         </div>
-        <div class="field-hint">Produk hanya discrape jika penjualan berada di rentang Min &mdash; Max ini.</div>
+        <div class="field-hint">Otomatis mengisi filter Minimal 50 pcs di Kalodata.</div>
+        <input type="hidden" name="min_sales" value="50">
       </div>
 
       <div class="form-group">
         <label class="form-label" for="manual_limit">Batas Maksimal Baris (Trigger Manual)</label>
         <input type="number" id="manual_limit" name="limit" value="{{ (manual_config or {}).get('limit') or 200 }}" min="1" max="2000" class="form-input" required>
-        <div class="field-hint">Batas baris khusus trigger manual. Filter aktif: Kreator &ge; Rp50 Juta &amp; Produk &ge; {{ (manual_config or {}).get('min_sales') or min_product_sales }} pcs.</div>
+        <div class="field-hint">Batas baris khusus trigger manual. Filter aktif: Kreator &ge; Rp50 Juta &amp; Produk &ge; 50 pcs.</div>
       </div>
 
       <div class="form-group">

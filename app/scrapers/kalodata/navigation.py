@@ -489,7 +489,9 @@ class KalodataNavigator:
                 self.page.wait_for_timeout(300)
 
             # 3. Click blue 'OK' button inside the popover
-            ok_btn = popover.locator("button:has-text('OK'), button.ant-btn-primary, text=/^OK$/i").last
+            ok_btn = popover.locator("button").filter(has_text=re.compile(r"^OK$", re.I)).last
+            if not ok_btn.is_visible(timeout=500):
+                ok_btn = popover.locator("button:has-text('OK'), button.ant-btn-primary").last
             if ok_btn.is_visible(timeout=1500):
                 ok_btn.click(force=True)
                 self.page.wait_for_timeout(1000)

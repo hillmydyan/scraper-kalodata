@@ -113,9 +113,14 @@ class TestKalodataNavigatorSalesFilter:
                 mock_loc.last = MagicMock(is_visible=lambda timeout=None: False)
             return mock_loc
 
+        button_loc = MagicMock()
+        button_loc.filter.return_value.last = ok_btn
+
         def popover_loc_side_effect(selector):
             if selector == "input":
                 return input_loc
+            if selector == "button":
+                return button_loc
             mock_loc = MagicMock()
             if "OK" in selector:
                 mock_loc.last = ok_btn

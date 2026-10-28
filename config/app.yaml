@@ -11,7 +11,7 @@ scraping:
   min_creator_revenue_idr: 50000000
   min_creator_revenue_myr: 14000
   min_creator_revenue_thb: 110000
-  min_product_sales: 150
+  min_product_sales: 50
   checkpoint_every: 25
   max_reject_ratio: 0.20
   delay_page_min_sec: 2.0

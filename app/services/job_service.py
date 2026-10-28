@@ -32,7 +32,7 @@ class JobService:
                 return int(st.value)
         except Exception:
             pass
-        return getattr(settings, "MIN_PRODUCT_SALES", 150)
+        return getattr(settings, "MIN_PRODUCT_SALES", 50)
 
     @staticmethod
     def get_max_product_sales(db: Session) -> Optional[int]:

@@ -122,7 +122,7 @@ class TestJobServiceMinProductSales:
         from app.services.job_service import JobService
         db = MagicMock()
         db.get.return_value = None
-        assert JobService.get_min_product_sales(db) == 150
+        assert JobService.get_min_product_sales(db) == 50
 
     def test_get_min_product_sales_from_db(self):
         from app.services.job_service import JobService
