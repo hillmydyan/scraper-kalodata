@@ -122,6 +122,10 @@ class SchedulerService:
             module = cfg.get("module", "creator")
             headless = getattr(settings, "KALODATA_HEADLESS", False)
 
+            t_limit = cfg.get("target_limit", 400) or 400
+            if t_limit > 400:
+                t_limit = 400
+
             from app.services.job_service import JobService
             if module == "both":
                 def run_both_sequentially():
@@ -152,7 +156,7 @@ class SchedulerService:
                         try:
                             jobs = db_exec.query(ScrapeJob).filter_by(run_id=run_id).order_by(ScrapeJob.created_at).all()
                             for j in jobs:
-                                JobService.execute_job_now(j.id, limit=None, headless=headless)
+                                JobService.execute_job_now(j.id, limit=t_limit, headless=headless)
                             r_obj = db_exec.get(ScrapeRun, run_id)
                             if r_obj:
                                 r_obj.status = "COMPLETED"
@@ -196,8 +200,8 @@ class SchedulerService:
                     time=target_time_str
                 )
 
-                # Limit is None for scheduled runs to scrape all valid rows matching thresholds
-                JobService.dispatch_run_in_background(run.id, limit=None, headless=headless)
+                # Limit is bounded by target_limit (capped at 400 for products)
+                JobService.dispatch_run_in_background(run.id, limit=t_limit, headless=headless)
                 return f"Triggered scheduled run: {run.id}"
         except Exception as e:
             logger.error("Error evaluating auto-schedule", error=str(e), exc_info=True)

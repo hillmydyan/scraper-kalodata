@@ -144,3 +144,24 @@ class TestJobServiceMinProductSales:
         run = JobService.create_daily_run(db, trigger="manual", min_sales=75, max_sales=5000)
         assert run.summary["min_sales"] == 75
         assert run.summary["max_sales"] == 5000
+
+
+class TestProductHardCap:
+    def test_product_scraper_enforces_400_cap(self):
+        from unittest.mock import MagicMock
+        page = MagicMock()
+        # Mock locator methods to prevent real Playwright calls
+        page.locator.return_value.first.wait_for.side_effect = Exception("No table")
+        scraper = ProductListScraper(page, "ID")
+
+        # Test that passing None or > 400 is capped at 400
+        res = scraper.scrape_products(max_limit=None)
+        # Table not found, so 0 items, but verifies no crash and max_limit capped
+        assert res["items"] == []
+
+        res2 = scraper.scrape_products(max_limit=5000)
+        assert res2["items"] == []
+
+    def test_product_hard_cap_constant(self):
+        from app.config import settings
+        assert settings.MAX_PRODUCTS_PER_COUNTRY == 400

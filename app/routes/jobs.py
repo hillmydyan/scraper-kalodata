@@ -99,7 +99,7 @@ def save_schedule():
     else:
         schedule_time = request.form.get("schedule_time", "12:00")
 
-    target_limit_str = request.form.get("target_limit", "200")
+    target_limit_str = request.form.get("target_limit", "400")
     target_region = request.form.get("target_region", "ALL")
     module = request.form.get("module", "creator")
     auto_schedule = request.form.get("auto_schedule") in ("on", "true", "1")
@@ -107,7 +107,10 @@ def save_schedule():
     try:
         target_limit = int(target_limit_str)
     except ValueError:
-        target_limit = 200
+        target_limit = 400
+
+    if module == "product" and target_limit > 400:
+        target_limit = 400
 
     config_data = {
         "time": schedule_time,
@@ -196,11 +199,18 @@ def trigger_manual():
     else:
         country = "ALL"
 
-    limit_str = request.form.get("limit") or request.form.get("target_limit", "200")
+    module = request.form.get("module", "product")
+    if module not in ("product", "creator"):
+        module = "product"
+
+    limit_str = request.form.get("limit") or request.form.get("target_limit", "400")
     try:
         limit = int(limit_str)
     except ValueError:
-        limit = 200
+        limit = 400
+
+    if module == "product" and limit > 400:
+        limit = 400
 
     period_str = request.form.get("period")
     headless_str = request.form.get("headless", "false")
@@ -210,10 +220,6 @@ def trigger_manual():
         period_date = datetime.strptime(period_str, "%Y-%m-%d").date()
     except (ValueError, TypeError):
         period_date = date.today() - timedelta(days=1)
-
-    module = request.form.get("module", "product")
-    if module not in ("product", "creator"):
-        module = "product"
 
     target_countries = None if country == "ALL" else [country]
 

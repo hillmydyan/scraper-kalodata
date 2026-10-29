@@ -496,9 +496,13 @@ class JobService:
                     db.commit()
                     nav.apply_category_filter(job.country_code)
 
-                    # Determine minimum & maximum product sales threshold
+                    # Determine minimum & maximum product sales threshold and enforce hard cap of 400 rows for products
                     is_manual = (job.run.trigger == "manual") if job.run else False
-                    effective_max = limit if (is_manual and limit and limit > 0) else None
+                    product_cap = getattr(settings, "MAX_PRODUCTS_PER_COUNTRY", 400) or 400
+                    if limit and limit > 0:
+                        effective_max = min(limit, product_cap)
+                    else:
+                        effective_max = product_cap
                     if job.run and isinstance(job.run.summary, dict) and job.run.summary.get("min_sales") is not None:
                         try:
                             min_sales = int(job.run.summary["min_sales"])

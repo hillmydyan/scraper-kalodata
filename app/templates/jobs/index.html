@@ -122,8 +122,8 @@
         <span style="color: var(--color-success); font-weight: 700;">{{ icon('check', 14, stroke=2.5) }} Kreator: Pendapatan &ge; Rp50.000.000 (MY: RM14.000, TH: ฿110.000)</span>
         <span style="color: var(--color-success); font-weight: 700;">{{ icon('check', 14, stroke=2.5) }} Produk: Penjualan &ge; 50 Terjual</span>
       </div>
-      <span style="color: var(--color-text-muted); font-size: 0.78rem;">Sistem otomatis menyaring data tanpa batas kuota.</span>
-      <input type="hidden" id="target_limit" name="target_limit" value="{{ schedule_config.target_limit or 2000 }}">
+      <span style="color: var(--color-text-muted); font-size: 0.78rem;">Sistem otomatis menyaring data (Maksimal 400 produk/wilayah).</span>
+      <input type="hidden" id="target_limit" name="target_limit" value="{{ schedule_config.target_limit or 400 }}">
     </div>
 
     <div class="switch-row">
@@ -213,8 +213,8 @@
 
       <div class="form-group">
         <label class="form-label" for="manual_limit">Batas Maksimal Baris (Trigger Manual)</label>
-        <input type="number" id="manual_limit" name="limit" value="{{ (manual_config or {}).get('limit') or 200 }}" min="1" max="2000" class="form-input" required>
-        <div class="field-hint">Batas baris khusus trigger manual. Filter aktif: Kreator &ge; Rp50 Juta &amp; Produk &ge; 50 pcs.</div>
+        <input type="number" id="manual_limit" name="limit" value="{{ (manual_config or {}).get('limit') or 400 }}" min="1" max="400" class="form-input" required>
+        <div class="field-hint">Maksimal 400 item per eksekusi. Filter aktif: Kreator &ge; Rp50 Juta &amp; Produk &ge; 50 pcs.</div>
       </div>
 
       <div class="form-group">

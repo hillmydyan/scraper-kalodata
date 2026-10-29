@@ -70,7 +70,7 @@ class Settings:
     WEBHOOK_URL: Optional[str] = os.getenv("WEBHOOK_URL")
 
     # Scraper & scheduler params
-    MAX_PRODUCTS_PER_COUNTRY: int = APP_CONFIG.get("scraping", {}).get("max_products_per_country", 2000)
+    MAX_PRODUCTS_PER_COUNTRY: int = APP_CONFIG.get("scraping", {}).get("max_products_per_country", 400)
     MIN_CREATOR_REVENUE_IDR: float = float(APP_CONFIG.get("scraping", {}).get("min_creator_revenue_idr", 50000000))
     MIN_CREATOR_REVENUE_MYR: float = float(APP_CONFIG.get("scraping", {}).get("min_creator_revenue_myr", 14000))
     MIN_CREATOR_REVENUE_THB: float = float(APP_CONFIG.get("scraping", {}).get("min_creator_revenue_thb", 110000))

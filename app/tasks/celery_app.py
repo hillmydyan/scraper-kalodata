@@ -119,7 +119,7 @@ def run_daily_pipeline():
 
 
 @celery_app.task(name="app.tasks.celery_app.scrape_country_job")
-def scrape_country_job(job_id: str, limit: int = 2000, headless: Optional[bool] = None):
+def scrape_country_job(job_id: str, limit: int = 400, headless: Optional[bool] = None):
     """Executes single country scrape job."""
     from app.services.job_service import JobService
     if headless is None:

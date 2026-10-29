@@ -34,7 +34,7 @@ class ProductListScraper:
 
     def scrape_products(
         self,
-        max_limit: Optional[int] = 2000,
+        max_limit: Optional[int] = 400,
         min_sales: Optional[int] = 150,
         max_sales: Optional[int] = None,
         checkpoint_cb: Optional[Callable[[List[Dict[str, Any]], int], None]] = None,
@@ -42,11 +42,18 @@ class ProductListScraper:
         revenue_source_method: str = "product_filter"
     ) -> Dict[str, Any]:
         """
-        Iterates product table rows up to max_limit (or all pages if max_limit is None).
+        Iterates product table rows up to max_limit (hard-capped at MAX_PRODUCTS_PER_COUNTRY, default 400).
         Saves checkpoints and validates data per row.
         """
+        # Hard cap for products: maximum 400 rows
+        product_hard_cap = getattr(settings, "MAX_PRODUCTS_PER_COUNTRY", 400) or 400
+        if max_limit is None or max_limit <= 0 or max_limit > product_hard_cap:
+            max_limit = product_hard_cap
+
         items: List[Dict[str, Any]] = []
         rejected: List[Dict[str, Any]] = []
+        seen_product_ids = set()
+        consecutive_stale_pages = 0
         is_truncated = False
 
         self.dismiss_overlays()
@@ -82,7 +89,7 @@ class ProductListScraper:
         consecutive_rejects = 0
         stop_scraping = False
 
-        while not stop_scraping and (max_limit is None or len(items) < max_limit):
+        while not stop_scraping and len(items) < max_limit:
             self.dismiss_overlays()
 
             # Check for Cloudflare challenge and wait for operator if needed
@@ -128,6 +135,7 @@ class ProductListScraper:
                 break
 
             logger.info("Processing rows on page", page=page_number, count=len(rows))
+            new_items_on_page = 0
 
             for row_idx, row in enumerate(rows):
                 if max_limit is not None and len(items) >= max_limit:
@@ -260,16 +268,39 @@ class ProductListScraper:
                     consecutive_rejects += 1
                     continue
 
+                # Check duplicate within this run
+                prod_id = extracted.get("source_product_id")
+                if prod_id and prod_id in seen_product_ids:
+                    continue
+                if prod_id:
+                    seen_product_ids.add(prod_id)
+
                 # Row accepted
                 consecutive_rejects = 0
+                new_items_on_page += 1
                 items.append(extracted)
 
                 # Checkpoint callback (§6.5 no. 9)
                 if checkpoint_cb and len(items) % settings.CHECKPOINT_EVERY == 0:
                     checkpoint_cb(items, total_scanned)
 
+                # Immediately stop if max_limit (e.g. 400) is reached
+                if len(items) >= max_limit:
+                    is_truncated = True
+                    stop_scraping = True
+                    break
+
             if stop_scraping:
                 break
+
+            # Guard against stale pagination (clicking next but remaining on same page)
+            if len(rows) > 0 and new_items_on_page == 0:
+                consecutive_stale_pages += 1
+                if consecutive_stale_pages >= 2:
+                    logger.info("Pagination stale: no new products found on 2 consecutive pages, stopping.", total_scanned=total_scanned, items_saved=len(items))
+                    break
+            else:
+                consecutive_stale_pages = 0
 
             # Pagination: look for 'Next' button
             try:
