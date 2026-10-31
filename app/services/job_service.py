@@ -239,40 +239,78 @@ class JobService:
     ) -> int:
         """
         Upserts creator products into kalodata_creator_product_results.
+        Duplicate (creator, product, period) combinations update the existing
+        row instead of inserting a new one, preventing duplicate rows across
+        repeated/overlapping scrape jobs for the same period.
         """
         now_utc = datetime.now(timezone.utc)
         count = 0
+        seen_in_batch = set()
         for item in items:
             source_id = str(item.get("source_product_id") or "")
             c_name = item.get("creator_name", "")
+            c_id = item.get("creator_id")
             c_shop = item.get("shop_name")
             if c_shop:
                 first_line = str(c_shop).split("\n")[0].strip()
                 c_shop = re.sub(r"\s*(?:Toko Lokal|Toko Cross Border|Lintas Batas|Local Shop|Cross Border)\s*$", "", first_line, flags=re.I).strip()
-            new_res = KalodataCreatorProductResult(
-                id=str(uuid.uuid4()),
-                scrape_job_id=job_id,
-                creator_name=c_name,
-                creator_id=item.get("creator_id"),
-                creator_rank=item.get("creator_rank"),
-                product_rank=item.get("product_rank"),
-                source_product_id=source_id,
-                product_name=item.get("product_name", ""),
-                shop_name=c_shop,
-                product_url=item.get("product_url"),
-                revenue_value=item.get("revenue_value"),
-                revenue_raw=item.get("revenue_raw", ""),
-                sales_value=item.get("sales_value"),
-                sales_raw=item.get("sales_raw", ""),
-                commission_rate=item.get("commission_rate"),
-                commission_raw=item.get("commission_raw"),
-                currency_code=item.get("currency_code", country_code),
-                country_code=country_code,
-                period_start=period_date,
-                period_end=period_date,
-                scraped_at=now_utc
-            )
-            db.add(new_res)
+
+            dedup_key = (c_id or c_name, source_id)
+            if dedup_key in seen_in_batch:
+                continue
+            seen_in_batch.add(dedup_key)
+
+            existing = db.execute(
+                select(KalodataCreatorProductResult).filter_by(
+                    country_code=country_code,
+                    source_product_id=source_id,
+                    creator_id=c_id,
+                    creator_name=c_name,
+                    period_start=period_date,
+                    period_end=period_date
+                )
+            ).scalar_one_or_none()
+
+            if existing:
+                existing.scrape_job_id = job_id
+                existing.creator_rank = item.get("creator_rank")
+                existing.product_rank = item.get("product_rank")
+                existing.product_name = item.get("product_name", "")
+                existing.shop_name = c_shop
+                existing.product_url = item.get("product_url")
+                existing.revenue_value = item.get("revenue_value")
+                existing.revenue_raw = item.get("revenue_raw", "")
+                existing.sales_value = item.get("sales_value")
+                existing.sales_raw = item.get("sales_raw", "")
+                existing.commission_rate = item.get("commission_rate")
+                existing.commission_raw = item.get("commission_raw")
+                existing.currency_code = item.get("currency_code", country_code)
+                existing.scraped_at = now_utc
+            else:
+                new_res = KalodataCreatorProductResult(
+                    id=str(uuid.uuid4()),
+                    scrape_job_id=job_id,
+                    creator_name=c_name,
+                    creator_id=c_id,
+                    creator_rank=item.get("creator_rank"),
+                    product_rank=item.get("product_rank"),
+                    source_product_id=source_id,
+                    product_name=item.get("product_name", ""),
+                    shop_name=c_shop,
+                    product_url=item.get("product_url"),
+                    revenue_value=item.get("revenue_value"),
+                    revenue_raw=item.get("revenue_raw", ""),
+                    sales_value=item.get("sales_value"),
+                    sales_raw=item.get("sales_raw", ""),
+                    commission_rate=item.get("commission_rate"),
+                    commission_raw=item.get("commission_raw"),
+                    currency_code=item.get("currency_code", country_code),
+                    country_code=country_code,
+                    period_start=period_date,
+                    period_end=period_date,
+                    scraped_at=now_utc
+                )
+                db.add(new_res)
             count += 1
         db.commit()
         return count

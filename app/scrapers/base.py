@@ -215,7 +215,7 @@ class BaseScraper:
             "slow_mo": slow_mo,
             "args": args,
             "ignore_default_args": ["--enable-automation"],
-            "viewport": {"width": 1440, "height": 900},
+            "viewport": {"width": 1920, "height": 1080},
             "env": env,
         }
         if channel:

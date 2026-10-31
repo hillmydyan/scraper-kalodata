@@ -187,7 +187,11 @@ class CreatorScraper:
         page_number = 1
         seen_creator_keys: Set[str] = set()
 
-        # Try to expand page size to 50 if available
+        # Try to expand page size to 50 if available. This used to be a silent
+        # try/except -- now logged so we can confirm whether the first page
+        # actually becomes a 50-row page (which correlates with "stuck at 50"
+        # always happening on the very first next-page click).
+        page_size_result = "not_attempted"
         try:
             size_trigger = self.page.locator('button[data-slot="select-trigger"]:has-text("Halaman"), button[data-slot="select-trigger"]:has-text("Page")').first
             if size_trigger.is_visible(timeout=1500):
@@ -198,8 +202,14 @@ class CreatorScraper:
                     opt_50.click()
                     self.page.wait_for_timeout(2000)
                     BaseScraper.pacing_page_delay()
-        except Exception:
-            pass
+                    page_size_result = "set_to_50"
+                else:
+                    page_size_result = "trigger_found_but_no_50_option"
+            else:
+                page_size_result = "trigger_not_visible"
+        except Exception as pse:
+            page_size_result = f"exception:{pse}"
+        logger.info("Page size selector result", result=page_size_result)
 
         # Tab for inspecting individual product details
         prod_tab = self.page.context.new_page()
@@ -372,11 +382,20 @@ class CreatorScraper:
                         detail_tab.wait_for_timeout(3000)
                     except Exception as click_ex:
                         logger.warning("Popup expect_page failed, falling back to direct URL with filters", creator=creator_log_name, error=str(click_ex))
-                        date_str = str(period_date) if period_date else (date.today() - timedelta(days=1)).strftime("%Y-%m-%d")
-                        full_c_url = f"{settings.KALODATA_BASE_URL.rstrip('/')}/creator/detail?id={creator_id}&language=id-ID&currency={self.currency_code}&region={self.country_code}&dateRange=%5B%22{date_str}%22%2C%22{date_str}%22%5D&cateValue=%5B%5B%22601152%22%2C%22842376%22%5D%5D"
-                        detail_tab = self.page.context.new_page()
-                        detail_tab.goto(full_c_url, wait_until="domcontentloaded", timeout=25000)
-                        detail_tab.wait_for_timeout(3000)
+                        try:
+                            date_str = str(period_date) if period_date else (date.today() - timedelta(days=1)).strftime("%Y-%m-%d")
+                            full_c_url = f"{settings.KALODATA_BASE_URL.rstrip('/')}/creator/detail?id={creator_id}&language=id-ID&currency={self.currency_code}&region={self.country_code}&dateRange=%5B%22{date_str}%22%2C%22{date_str}%22%5D&cateValue=%5B%5B%22601152%22%2C%22842376%22%5D%5D"
+                            detail_tab = self.page.context.new_page()
+                            detail_tab.goto(full_c_url, wait_until="domcontentloaded", timeout=25000)
+                            detail_tab.wait_for_timeout(3000)
+                        except Exception as fallback_ex:
+                            logger.warning("Fallback direct navigation also failed, skipping creator", creator=creator_log_name, creator_id=creator_id, error=str(fallback_ex))
+                            if detail_tab and not detail_tab.is_closed():
+                                try:
+                                    detail_tab.close()
+                                except Exception:
+                                    pass
+                            continue
 
                     try:
                         self.dismiss_overlays(detail_tab)
@@ -622,6 +641,23 @@ class CreatorScraper:
 
                             BaseScraper.pacing_page_delay()
                             self.dismiss_overlays()
+
+                            # Reset scroll position to top so the stuck-detection check below
+                            # always reads the table consistently, regardless of where the
+                            # previous page's row-by-row scan left the viewport.
+                            try:
+                                self.page.evaluate("window.scrollTo(0, 0)")
+                                self.page.wait_for_timeout(200)
+                            except Exception:
+                                pass
+
+                            # Table data loads via XHR after the click; DOM text can still be
+                            # mid-fetch even after the wait_for_function above resolves.
+                            try:
+                                self.page.wait_for_load_state("networkidle", timeout=4000)
+                            except Exception:
+                                pass
+
                             page_number += 1
                             break
 
@@ -629,14 +665,34 @@ class CreatorScraper:
                         logger.info("No next page button found or disabled. Reached end of creator list.", total_scanned=total_creators_scanned, current_page=page_number)
                         break
 
-                    # Check if the table DOM actually advanced or if it's stuck on the old page
+                    # Check if the table DOM actually advanced or if it's stuck on the old page.
+                    # Retry a few times with extra wait before concluding pagination is truly
+                    # stuck -- a single stale read right after the click can false-positive on
+                    # slow page transitions (confirmed via logs: run stopped at creator 10 once,
+                    # creator 50 another time, proving the click works intermittently well past
+                    # page 1 and the failure is a race condition, not a hard stop).
+                    # Checks the first 3 rows (not just row 1) and uses more/longer retries so a
+                    # momentarily-invisible row (mid scroll/re-render) doesn't false-positive.
                     try:
-                        next_first_tr = self.page.locator("tbody tr.group, tbody tr").first
-                        if next_first_tr.is_visible(timeout=1000):
-                            next_first_text = (next_first_tr.inner_text() or "").strip()
-                            if old_first_row_text and next_first_text == old_first_row_text:
-                                logger.warning("Table rows did not change after pagination click, stopping to prevent duplicate scraping", page=page_number)
+                        stuck_confirmed = False
+                        for _retry in range(8):
+                            rows_now = self.page.locator("tbody tr.group, tbody tr").all()[:3]
+                            texts_now = []
+                            for r in rows_now:
+                                try:
+                                    if r.is_visible(timeout=500):
+                                        texts_now.append((r.inner_text() or "").strip())
+                                except Exception:
+                                    continue
+                            joined_now = "|".join(t for t in texts_now if t)
+                            if joined_now and (not old_first_row_text or joined_now != old_first_row_text):
+                                stuck_confirmed = False
                                 break
+                            stuck_confirmed = bool(joined_now)
+                            self.page.wait_for_timeout(1200)
+                        if stuck_confirmed:
+                            logger.warning("Table rows did not change after pagination click (confirmed after retries), stopping to prevent duplicate scraping", page=page_number)
+                            break
                     except Exception:
                         pass
                 except Exception as p_ex:
