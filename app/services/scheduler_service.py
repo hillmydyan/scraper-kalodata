@@ -17,6 +17,16 @@ from app.models import SessionLocal
 
 logger = structlog.get_logger(__name__)
 
+CREATOR_SCHEDULE_KEY = "creator_schedule_config"
+CREATOR_WINDOW_HOURS = 6
+DEFAULT_CREATOR_SCHEDULE = {
+    "enabled": True,
+    "day_of_week": 6,  # 0=Senin ... 6=Minggu
+    "time": "05:00",
+    "target_region": "ALL",
+}
+DAY_NAMES_ID = ["Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu", "Minggu"]
+
 
 def parse_schedule_time(raw_time: str) -> Optional[str]:
     """
@@ -44,6 +54,106 @@ class SchedulerService:
 
     @classmethod
     def check_and_trigger(cls) -> Optional[str]:
+        """Evaluates weekly creator schedule, then daily product schedule."""
+        creator_res = None
+        try:
+            creator_res = cls.check_and_trigger_creator()
+        except Exception as e:
+            logger.error("Error evaluating creator weekly schedule", error=str(e), exc_info=True)
+            creator_res = f"Creator error: {e}"
+        product_res = cls._check_and_trigger_product()
+        if creator_res and creator_res.startswith("Triggered"):
+            return f"{creator_res} | {product_res}"
+        return product_res
+
+    @classmethod
+    def check_and_trigger_creator(cls) -> str:
+        """
+        Weekly creator schedule (setting key: creator_schedule_config).
+        Runs once per scheduled day. If the worker is busy at the scheduled time,
+        retries every minute until CREATOR_WINDOW_HOURS after the scheduled time.
+        Uses a row lock + last_run_date so web thread and Celery Beat never double-trigger.
+        """
+        wib_tz = zoneinfo.ZoneInfo("Asia/Jakarta")
+        now_wib = datetime.now(wib_tz)
+        today_str = now_wib.date().isoformat()
+
+        db = SessionLocal()
+        try:
+            from app.models.entities import Setting, ScrapeRun, ScrapeJob
+            from sqlalchemy import select
+            from sqlalchemy.orm.attributes import flag_modified
+
+            setting = db.execute(
+                select(Setting).where(Setting.key == CREATOR_SCHEDULE_KEY).with_for_update()
+            ).scalar_one_or_none()
+            if not setting or not isinstance(setting.value, dict):
+                return "No creator schedule"
+            cfg = dict(setting.value)
+            if not cfg.get("enabled", False):
+                return "Creator schedule disabled"
+
+            try:
+                day_of_week = int(cfg.get("day_of_week", 6))
+            except (TypeError, ValueError):
+                day_of_week = 6
+            if now_wib.weekday() != day_of_week:
+                return "Creator: not scheduled day"
+            if cfg.get("last_run_date") == today_str:
+                return "Creator: already ran today"
+
+            target_time_str = parse_schedule_time(cfg.get("time", "05:00")) or "05:00"
+            h, m = (int(x) for x in target_time_str.split(":"))
+            start_at = now_wib.replace(hour=h, minute=m, second=0, microsecond=0)
+            end_at = start_at + timedelta(hours=CREATOR_WINDOW_HOURS)
+            if now_wib < start_at:
+                return "Creator: before scheduled time"
+            if now_wib >= end_at:
+                return "Creator: window passed"
+
+            stale_cutoff = datetime.now(timezone.utc) - timedelta(minutes=getattr(settings, "DAILY_RUN_TIMEOUT_MINUTES", 120))
+            active_job = db.query(ScrapeJob).filter(ScrapeJob.status.in_(["RUNNING", "CLAIMED", "IN_PROGRESS"])).first()
+            busy = active_job is not None
+            if not busy:
+                busy = db.query(ScrapeJob).join(ScrapeRun, ScrapeJob.run_id == ScrapeRun.id).filter(
+                    ScrapeRun.status == "RUNNING",
+                    ScrapeRun.started_at >= stale_cutoff,
+                    ScrapeJob.status.in_(["PENDING", "RUNNING", "CLAIMED", "IN_PROGRESS"])
+                ).first() is not None
+            if busy:
+                logger.info("Creator weekly schedule waiting: another scrape is still running")
+                return "Creator: waiting for running scrape"
+
+            region = cfg.get("target_region", "ALL")
+            target_countries = None if region == "ALL" else [region]
+            headless = getattr(settings, "KALODATA_HEADLESS", False)
+
+            from app.services.job_service import JobService
+            yesterday = (now_wib - timedelta(days=1)).date()
+            run = JobService.create_daily_run(
+                db,
+                period_date=yesterday,
+                trigger="scheduled",
+                created_by="auto_scheduler_creator_weekly",
+                countries=target_countries,
+                module="creator",
+            )
+            cfg["last_run_date"] = today_str
+            setting.value = cfg
+            flag_modified(setting, "value")
+            db.commit()
+
+            logger.info("Creator weekly schedule triggered", run_id=run.id, region=region, time=target_time_str)
+            JobService.dispatch_run_in_background(run.id, limit=400, headless=headless)
+            return f"Triggered creator weekly run: {run.id}"
+        except Exception:
+            db.rollback()
+            raise
+        finally:
+            db.close()
+
+    @classmethod
+    def _check_and_trigger_product(cls) -> Optional[str]:
         """
         Evaluates schedule_config in DB against current WIB time.
         If time matches and auto_schedule is True, dispatches the run.
