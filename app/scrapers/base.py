@@ -197,6 +197,10 @@ class BaseScraper:
             "--disable-background-networking",
             "--disable-default-apps",
             "--disable-sync",
+            # Jendela pas dengan layar VNC (1920x1080) di pojok kiri atas,
+            # supaya tab bar, address bar & pagination bawah kelihatan.
+            f"--window-size={os.getenv('KALODATA_WINDOW_WIDTH', '1920')},{os.getenv('KALODATA_WINDOW_HEIGHT', '1080')}",
+            "--window-position=0,0",
         ]
         if headless:
             args.extend([
@@ -218,7 +222,8 @@ class BaseScraper:
             "slow_mo": slow_mo,
             "args": args,
             "ignore_default_args": ["--enable-automation"],
-            "viewport": {"width": 1920, "height": 1080},
+            # Viewport ikut ukuran jendela (tidak dipaksa 1920x1080 yang bikin jendela lebih tinggi dari layar)
+            "no_viewport": True,
             "env": env,
         }
         if channel:

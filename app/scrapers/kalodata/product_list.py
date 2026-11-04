@@ -32,6 +32,45 @@ class ProductListScraper:
         except Exception:
             pass
 
+    def _page_signature(self) -> str:
+        """Sidik jari halaman tabel: gabungan ID produk (dari URL gambar) 5 baris pertama."""
+        try:
+            return self.page.evaluate("""() => {
+                const rows = Array.from(document.querySelectorAll('tbody tr')).slice(0, 5);
+                return rows.map(r => {
+                    const td = r.querySelectorAll('td')[1];
+                    const img = td ? td.querySelector('div[style*="background-image"], img') : null;
+                    const src = img ? (img.getAttribute('style') || img.getAttribute('src') || '') : '';
+                    const m = src.match(/tiktok\\.product\\/(\\d+)\\//);
+                    return m ? m[1] : (r.innerText || '').slice(0, 40);
+                }).join('|');
+            }""") or ""
+        except Exception:
+            return ""
+
+    def _active_page_label(self) -> str:
+        """Nomor halaman yang aktif menurut komponen pagination Kalodata (kalau terbaca)."""
+        try:
+            return self.page.evaluate("""() => {
+                const el = document.querySelector("[data-slot='pagination-link'][aria-current='page'], [data-slot='pagination-link'][data-active='true'], .ant-pagination-item-active, .el-pager li.is-active");
+                return el ? el.innerText.trim() : '';
+            }""") or ""
+        except Exception:
+            return ""
+
+    def _wait_table_changed(self, old_sig: str, timeout_ms: int = 20000) -> bool:
+        """Tunggu sampai isi tabel benar-benar berganti setelah klik pindah halaman."""
+        waited = 0
+        while waited < timeout_ms:
+            self.page.wait_for_timeout(500)
+            waited += 500
+            new_sig = self._page_signature()
+            if new_sig and new_sig != old_sig:
+                # beri waktu render baris sisanya
+                self.page.wait_for_timeout(1500)
+                return True
+        return False
+
     def scrape_products(
         self,
         max_limit: Optional[int] = 400,
@@ -134,8 +173,17 @@ class ProductListScraper:
                 logger.info("No more product rows found on page", page=page_number)
                 break
 
-            logger.info("Processing rows on page", page=page_number, count=len(rows))
+            logger.info(
+                "Processing rows on page",
+                page=page_number,
+                count=len(rows),
+                active_page_ui=self._active_page_label(),
+                signature=self._page_signature()[:120],
+            )
             new_items_on_page = 0
+            dup_on_page = 0
+            first_id_on_page = None
+            last_id_on_page = None
 
             for row_idx, row in enumerate(rows):
                 if max_limit is not None and len(items) >= max_limit:
@@ -161,6 +209,16 @@ class ProductListScraper:
                         "raw": {"text": row_text}
                     })
                     consecutive_rejects += 1
+                    continue
+
+                # Cek duplikat SEBELUM buka detail (hemat waktu, dan deteksi halaman tidak berganti)
+                early_id = extracted.get("source_product_id")
+                if early_id:
+                    if first_id_on_page is None:
+                        first_id_on_page = early_id
+                    last_id_on_page = early_id
+                if early_id and early_id in seen_product_ids:
+                    dup_on_page += 1
                     continue
 
                 # Filter products with sales < min_sales (e.g. sales >= 50 passes, sales < 50 rejected)
@@ -293,11 +351,22 @@ class ProductListScraper:
             if stop_scraping:
                 break
 
-            # Guard against stale pagination (clicking next but remaining on same page)
-            if len(rows) > 0 and new_items_on_page == 0:
+            logger.info(
+                "Page summary",
+                page=page_number,
+                rows=len(rows),
+                new_items=new_items_on_page,
+                duplicates=dup_on_page,
+                first_product_id=first_id_on_page,
+                last_product_id=last_id_on_page,
+                items_saved=len(items),
+            )
+
+            # Guard against stale pagination: hanya dihitung kalau isi halaman memang duplikat semua
+            if len(rows) > 0 and new_items_on_page == 0 and dup_on_page >= max(1, int(len(rows) * 0.8)):
                 consecutive_stale_pages += 1
                 if consecutive_stale_pages >= 2:
-                    logger.info("Pagination stale: no new products found on 2 consecutive pages, stopping.", total_scanned=total_scanned, items_saved=len(items))
+                    logger.info("Pagination stale: no new products found on 2 consecutive pages, stopping.", total_scanned=total_scanned, items_saved=len(items), page=page_number)
                     break
             else:
                 consecutive_stale_pages = 0
@@ -318,6 +387,7 @@ class ProductListScraper:
                     "button:has-text('Next')"
                 ]
                 clicked_next = False
+                sig_before = self._page_signature()
                 for n_sel in next_selectors:
                     btn = self.page.locator(n_sel).first
                     if btn.is_visible(timeout=1000):
@@ -332,16 +402,37 @@ class ProductListScraper:
                         if "pointer-events-none" in cls_tokens or "opacity-50" in cls_tokens or "disabled" in cls_tokens or "is-disabled" in cls_tokens:
                             continue
                         self.dismiss_overlays()
+                        try:
+                            btn.scroll_into_view_if_needed(timeout=2000)
+                        except Exception:
+                            pass
                         btn.click(force=True)
-                        clicked_next = True
                         BaseScraper.pacing_page_delay()
-                        self.page.wait_for_timeout(2500)
+                        changed = self._wait_table_changed(sig_before)
+                        if not changed:
+                            # Tabel belum berganti: coba selector berikutnya (mis. tombol panah Next)
+                            logger.warning(
+                                "Table did not change after clicking pagination, trying next selector",
+                                selector=n_sel,
+                                page=page_number,
+                                active_page_ui=self._active_page_label(),
+                            )
+                            continue
+                        clicked_next = True
                         self.dismiss_overlays()
                         page_number += 1
+                        logger.info("Moved to next page", page=page_number, selector=n_sel, active_page_ui=self._active_page_label())
                         break
 
                 if not clicked_next:
-                    logger.info("Next page button disabled or absent. Reached last page.", total_scanned=total_scanned, current_page=page_number)
+                    logger.info("Next page button disabled/absent or table did not change. Stopping.", total_scanned=total_scanned, current_page=page_number, items_saved=len(items))
+                    try:
+                        from app.config import settings as _s
+                        shot = _s.RUNTIME_DIR / "screenshots" / f"{self.job_id or 'nojob'}_pagination_stop_{self.country_code}_p{page_number}.png"
+                        shot.parent.mkdir(parents=True, exist_ok=True)
+                        self.page.screenshot(path=str(shot))
+                    except Exception:
+                        pass
                     break
             except Exception as p_ex:
                 logger.info("Could not navigate to next page.", error=str(p_ex))
