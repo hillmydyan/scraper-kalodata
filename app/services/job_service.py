@@ -35,6 +35,25 @@ class JobService:
         return getattr(settings, "MIN_PRODUCT_SALES", 50)
 
     @staticmethod
+    def get_product_limit(db: Session, default: int = 300) -> int:
+        """Limit produk dari setting schedule_config.target_limit (1-400). Dipakai picu ulang & lanjut otomatis."""
+        try:
+            st = db.get(Setting, "schedule_config")
+            if st and isinstance(st.value, dict):
+                v = int(st.value.get("target_limit") or default)
+                return max(1, min(v, 400))
+        except Exception:
+            pass
+        return default
+
+    @staticmethod
+    def has_active_job(db: Session) -> bool:
+        """True kalau ada job scraping yang sedang jalan (dipakai untuk skip cek sesi)."""
+        return db.query(ScrapeJob).filter(
+            ScrapeJob.status.in_(["RUNNING", "CLAIMED", "IN_PROGRESS", "BLOCKED"])
+        ).first() is not None
+
+    @staticmethod
     def get_max_product_sales(db: Session) -> Optional[int]:
         """Gets the configured maximum product sales threshold (or None if unconstrained)."""
         try:
@@ -657,8 +676,8 @@ class JobService:
         import threading
         from app.models import SessionLocal
 
-        if headless is None:
-            headless = True if sys.platform != "win32" else False
+        # Headless mode dihapus: selalu visible di VNC
+        headless = False
 
         # Clear any stale profile lock before starting new execution
         try:

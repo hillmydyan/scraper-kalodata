@@ -59,7 +59,8 @@ class Settings:
     
     # Browser & Display
     KALODATA_DISPLAY: str = os.getenv("KALODATA_DISPLAY", ":1")
-    KALODATA_HEADLESS: bool = os.getenv("KALODATA_HEADLESS", "true" if sys.platform != "win32" else "false").lower() == "true"
+    # Deprecated: headless mode dihapus, browser selalu tampil di VNC. Disimpan hanya untuk kompatibilitas .env lama.
+    KALODATA_HEADLESS: bool = False
     _raw_chrome_dir = os.getenv("CHROME_USER_DATA_DIR", "runtime/chrome_profile")
     CHROME_USER_DATA_DIR: str = str((BASE_DIR / _raw_chrome_dir).resolve()) if not Path(_raw_chrome_dir).is_absolute() else _raw_chrome_dir
     

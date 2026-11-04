@@ -65,7 +65,6 @@ def index():
                 "limit": schedule_config.get("target_limit", 200),
                 "module": "creator",
                 "country": "ID",
-                "headless": "true"
             }
 
         from app.services.scheduler_service import DEFAULT_CREATOR_SCHEDULE, CREATOR_SCHEDULE_KEY, DAY_NAMES_ID
@@ -276,8 +275,8 @@ def trigger_manual():
         limit = 400
 
     period_str = request.form.get("period")
-    headless_str = request.form.get("headless", "false")
-    headless = (headless_str == "true")
+    # Headless mode dihapus: browser selalu tampil di VNC
+    headless = False
 
     try:
         period_date = datetime.strptime(period_str, "%Y-%m-%d").date()
@@ -310,7 +309,6 @@ def trigger_manual():
             "limit": limit,
             "module": module,
             "country": country,
-            "headless": headless_str,
             "period": period_str,
             "min_sales": min_sales,
             "max_sales": max_sales
@@ -410,7 +408,7 @@ def retry_job(job_id: str):
         db.commit()
 
         run_id = job.run_id or job.id
-        JobService.dispatch_run_in_background(run_id, limit=200, headless=True)
+        JobService.dispatch_run_in_background(run_id, limit=JobService.get_product_limit(db), headless=False)
         flash(f"Job scraping ({job.country_code}) berhasil dipicu ulang di latar belakang!", "success")
         return redirect(url_for("jobs.index"))
     finally:

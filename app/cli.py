@@ -102,7 +102,7 @@ def cmd_export_session(args):
     s = BaseScraper(profile_label=args.profile)
     s.acquire_lock()
     try:
-        ctx = s.launch_browser(headless=True)
+        ctx = s.launch_browser(headless=False)
         session_file = settings.RUNTIME_DIR / "kalodata_session.json"
         ctx.storage_state(path=str(session_file))
         cookies_count = len(ctx.cookies())
@@ -122,7 +122,7 @@ def cmd_import_session(args):
     s = BaseScraper(profile_label=args.profile)
     s.acquire_lock()
     try:
-        ctx = s.launch_browser(headless=True)
+        ctx = s.launch_browser(headless=False)
         page = ctx.new_page()
         status, msg = SessionManager.validate_session(page)
         print(f"Session Import & Validation: [{status}] {msg}")
@@ -188,7 +188,7 @@ def cmd_scrape(args):
 
     target_country = args.country.upper()
     limit = args.limit
-    headless = args.headless
+    headless = False
 
     # Determine period
     if args.period == "yesterday":
@@ -296,7 +296,6 @@ def main():
     p_scrape.add_argument("--period", default="yesterday", help="Period date (yesterday or YYYY-MM-DD)")
     p_scrape.add_argument("--limit", type=int, default=5, help="Max items/creators to scrape")
     p_scrape.add_argument("--profile", default="default", help="Account profile directory name")
-    p_scrape.add_argument("--headless", action="store_true", help="Run headless mode")
     p_scrape.add_argument("--no-export", action="store_true", help="Skip Excel export generation")
     p_scrape.set_defaults(func=cmd_scrape)
 
