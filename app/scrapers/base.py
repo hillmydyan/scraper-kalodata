@@ -161,8 +161,11 @@ class BaseScraper:
         """
         from playwright.sync_api import sync_playwright
 
-        if headless is None:
-            headless = settings.KALODATA_HEADLESS
+        # Mode headless dihapus: Kalodata/Cloudflare memblokir Chrome headless
+        # (ACCESS_RESTRICTED / Turnstile palsu). Browser SELALU tampil di DISPLAY VNC.
+        if headless:
+            logger.warning("Headless mode requested but disabled; launching visible browser on VNC display")
+        headless = False
 
         if channel is None:
             raw_channel = os.getenv("CHROME_CHANNEL", "").strip()

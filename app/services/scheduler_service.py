@@ -126,7 +126,7 @@ class SchedulerService:
 
             region = cfg.get("target_region", "ALL")
             target_countries = None if region == "ALL" else [region]
-            headless = getattr(settings, "KALODATA_HEADLESS", False)
+            headless = False
 
             from app.services.job_service import JobService
             yesterday = (now_wib - timedelta(days=1)).date()
@@ -230,7 +230,7 @@ class SchedulerService:
             region = cfg.get("target_region", "ALL")
             target_countries = None if region == "ALL" else [region]
             module = cfg.get("module", "creator")
-            headless = getattr(settings, "KALODATA_HEADLESS", False)
+            headless = False
 
             t_limit = cfg.get("target_limit", 400) or 400
             if t_limit > 400:

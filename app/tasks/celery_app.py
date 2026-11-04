@@ -122,9 +122,7 @@ def run_daily_pipeline():
 def scrape_country_job(job_id: str, limit: int = 400, headless: Optional[bool] = None):
     """Executes single country scrape job."""
     from app.services.job_service import JobService
-    if headless is None:
-        headless = settings.KALODATA_HEADLESS
-    JobService.execute_job_now(job_id, limit=limit, headless=headless)
+    JobService.execute_job_now(job_id, limit=limit, headless=False)
     return {"job_id": job_id, "status": "FINISHED"}
 
 
@@ -156,9 +154,10 @@ def open_login_browser(profile_label: str, profile_id: str, email: Optional[str]
                     ScrapeJob.status == "PENDING",
                     ScrapeJob.stage == "WAITING_LOGIN"
                 ).all()
+                resume_limit = JobService.get_product_limit(db)
                 for pj in pending_jobs:
-                    logger.info("Auto-resuming pending job after manual login", job_id=pj.id)
-                    JobService.dispatch_run_in_background(pj.run_id or pj.id, limit=200, headless=True)
+                    logger.info("Auto-resuming pending job after manual login", job_id=pj.id, limit=resume_limit)
+                    JobService.dispatch_run_in_background(pj.run_id or pj.id, limit=resume_limit, headless=False)
         finally:
             db.close()
         return {"status": "SUCCESS" if success else "FAILED", "message": msg}
@@ -180,7 +179,22 @@ def run_cleanup():
 def check_session():
     db = SessionLocal()
     try:
+        if JobService.has_active_job(db):
+            logger.info("Session check skipped: scrape job is running")
+            return {"status": "SKIPPED", "message": "Scrape job is running"}
         profile = SessionService.get_or_create_default_profile(db)
         return SessionService.validate_profile_session(db, profile.id)
+    finally:
+        db.close()
+
+@celery_app.task(name="app.tasks.celery_app.validate_profile_session_task")
+def validate_profile_session_task(profile_id: str):
+    """Validasi sesi dari tombol dashboard, dijalankan di worker (punya DISPLAY VNC)."""
+    db = SessionLocal()
+    try:
+        if JobService.has_active_job(db):
+            logger.info("Manual session validation skipped: scrape job is running")
+            return {"status": "SKIPPED", "message": "Scrape job is running"}
+        return SessionService.validate_profile_session(db, profile_id)
     finally:
         db.close()

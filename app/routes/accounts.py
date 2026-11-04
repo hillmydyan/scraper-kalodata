@@ -86,6 +86,18 @@ def save_account():
 def validate(profile_id: str):
     db = SessionLocal()
     try:
+        from app.services.job_service import JobService
+        if JobService.has_active_job(db):
+            flash("Validasi dilewati: masih ada job scraping yang berjalan.", "warning")
+            return redirect(url_for("accounts.index"))
+        # Browser harus tampil di VNC -> jalankan di worker (container web tidak punya DISPLAY)
+        try:
+            from app.tasks.celery_app import validate_profile_session_task
+            validate_profile_session_task.delay(profile_id)
+            flash("Validasi sesi dijalankan di worker (browser tampil di VNC). Refresh halaman ±30 detik lagi.", "info")
+            return redirect(url_for("accounts.index"))
+        except Exception:
+            pass
         res = SessionService.validate_profile_session(db, profile_id)
         if res.get("status") == "READY":
             flash("Sesi profil berhasil divalidasi dan AKTIF (READY).", "success")
@@ -184,8 +196,9 @@ def open_login(profile_id: str):
                             pending_jobs = db_t.query(ScrapeJob).filter(
                                 ScrapeJob.status == "PENDING"
                             ).all()
+                            resume_limit = JobService.get_product_limit(db_t)
                             for pj in pending_jobs:
-                                JobService.dispatch_run_in_background(pj.run_id or pj.id, limit=200, headless=True)
+                                JobService.dispatch_run_in_background(pj.run_id or pj.id, limit=resume_limit, headless=False)
                     finally:
                         db_t.close()
                 except Exception as ex:

@@ -301,12 +301,9 @@
       </div>
 
       <div class="form-group">
-        <label class="form-label" for="manual_browser">Tampilan Browser (Lokal)</label>
-        <select id="manual_browser" name="headless" class="form-select">
-          <option value="true" {% if (manual_config or {}).get('headless') != 'false' %}selected{% endif %}>Headless (Latar Belakang - Rekomendasi VPS)</option>
-          <option value="false" {% if (manual_config or {}).get('headless') == 'false' %}selected{% endif %}>Google Chrome (Desktop Visible)</option>
-        </select>
-        <div class="field-hint">Gunakan Headless untuk server VPS tanpa display desktop.</div>
+        <label class="form-label">Tampilan Browser</label>
+        <div class="form-input" style="display:flex; align-items:center;">Google Chrome (tampil di VNC)</div>
+        <div class="field-hint">Mode headless dihapus karena memicu Cloudflare/ACCESS_RESTRICTED. Jangan tutup Chrome di VNC saat job berjalan.</div>
       </div>
     </div>
 
