@@ -36,12 +36,12 @@ class JobService:
 
     @staticmethod
     def get_product_limit(db: Session, default: int = 300) -> int:
-        """Limit produk dari setting schedule_config.target_limit (1-400). Dipakai picu ulang & lanjut otomatis."""
+        """Limit produk dari setting schedule_config.target_limit (1-MAX_PRODUCTS_PER_COUNTRY). Dipakai picu ulang & lanjut otomatis."""
         try:
             st = db.get(Setting, "schedule_config")
             if st and isinstance(st.value, dict):
                 v = int(st.value.get("target_limit") or default)
-                return max(1, min(v, 400))
+                return max(1, min(v, settings.MAX_PRODUCTS_PER_COUNTRY))
         except Exception:
             pass
         return default
@@ -557,7 +557,7 @@ class JobService:
 
                     # Determine minimum & maximum product sales threshold and enforce hard cap of 400 rows for products
                     is_manual = (job.run.trigger == "manual") if job.run else False
-                    product_cap = getattr(settings, "MAX_PRODUCTS_PER_COUNTRY", 400) or 400
+                    product_cap = getattr(settings, "MAX_PRODUCTS_PER_COUNTRY", 300) or 300
                     if limit and limit > 0:
                         effective_max = min(limit, product_cap)
                     else:

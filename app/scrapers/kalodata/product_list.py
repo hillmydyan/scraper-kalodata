@@ -130,11 +130,12 @@ class ProductListScraper:
                 except Exception:
                     pass
                 before = self._page_signature()
+                self._uncover_pagination()
                 btn = self.page.locator(f"button[data-slot='pagination-link']:text-is('{current + 1}')").first
                 if not btn.is_visible(timeout=3000):
                     btn = self.page.locator("button[data-slot='pagination-link'][aria-label*='berikutnya' i], button[data-slot='pagination-link'][aria-label*='next' i]").first
                 btn.click(timeout=8000)
-                if not self._wait_table_changed(before):
+                if not self._wait_table_changed(before, expected_page=current + 1):
                     logger.warning("Pagination recovery: table did not change", step_to=current + 1, snapshot=self._pagination_snapshot())
                     return False
                 current += 1
@@ -156,17 +157,74 @@ class ProductListScraper:
         except Exception:
             pass
 
-    def _wait_table_changed(self, old_sig: str, timeout_ms: int = 20000) -> bool:
-        """Tunggu sampai isi tabel benar-benar berganti setelah klik pindah halaman."""
+    def _is_last_page(self, page_number: int) -> bool:
+        """True kalau memang halaman terakhir: tidak ada tombol nomor > page_number dan tombol Next nonaktif/tidak ada."""
+        try:
+            return bool(self.page.evaluate("""(cur) => {
+                const btns = Array.from(document.querySelectorAll("[data-slot='pagination-link']"));
+                if (!btns.length) return true;
+                const nums = btns.map(b => parseInt((b.innerText || '').trim(), 10)).filter(n => !isNaN(n));
+                if (nums.some(n => n > cur)) return false;
+                const nxt = btns.find(b => /berikutnya|next/i.test(b.getAttribute('aria-label') || ''));
+                if (!nxt) return true;
+                const cls = (nxt.className || '').toString();
+                return nxt.disabled || nxt.getAttribute('aria-disabled') === 'true' || nxt.getAttribute('data-disabled') === 'true'
+                    || /pointer-events-none|opacity-50|is-disabled/.test(cls);
+            }""", page_number))
+        except Exception:
+            return False
+
+    def _uncover_pagination(self) -> List[str]:
+        """Sembunyikan elemen melayang (mis. widget chat AI Kalodata) yang menutupi tombol pagination.
+        Ambil elemen di titik tengah tiap tombol; kalau bukan tombol itu sendiri, sembunyikan
+        ancestor fixed/sticky-nya (atau elemen itu sendiri). Return daftar elemen yang disembunyikan."""
+        try:
+            return self.page.evaluate("""() => {
+                const hidden = [];
+                const btns = Array.from(document.querySelectorAll("[data-slot='pagination-link']"));
+                for (const b of btns) {
+                    const r = b.getBoundingClientRect();
+                    if (r.width === 0 || r.height === 0) continue;
+                    const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+                    if (!hit || hit === b || b.contains(hit) || hit.contains(b)) continue;
+                    let el = hit, victim = hit;
+                    while (el && el !== document.body) {
+                        const pos = getComputedStyle(el).position;
+                        if (pos === 'fixed' || pos === 'sticky') { victim = el; break; }
+                        el = el.parentElement;
+                    }
+                    if (victim.contains(b)) continue;
+                    victim.style.setProperty('display', 'none', 'important');
+                    victim.setAttribute('data-kd-hidden', '1');
+                    hidden.push(victim.tagName + '.' + (victim.className || '').toString().slice(0, 60));
+                }
+                return hidden;
+            }""") or []
+        except Exception:
+            return []
+
+    def _wait_table_changed(self, old_sig: str, timeout_ms: int = 20000, expected_page: Optional[int] = None) -> bool:
+        """Tunggu sampai isi tabel benar-benar berganti setelah klik pindah halaman.
+        Wajib: signature baru stabil (dibaca 2x) & beda dari sebelumnya, dan kalau nomor
+        halaman aktif terbaca, harus sama dengan expected_page."""
         waited = 0
         while waited < timeout_ms:
             self.page.wait_for_timeout(500)
             waited += 500
             new_sig = self._page_signature()
-            if new_sig and new_sig != old_sig:
-                # beri waktu render baris sisanya
-                self.page.wait_for_timeout(1500)
-                return True
+            if not new_sig or new_sig == old_sig:
+                continue
+            # beri waktu render baris sisanya, lalu pastikan stabil (bukan state loading sesaat)
+            self.page.wait_for_timeout(1500)
+            waited += 1500
+            again = self._page_signature()
+            if not again or again == old_sig or again != new_sig:
+                continue
+            if expected_page is not None:
+                label = self._active_page_label()
+                if label and label != str(expected_page):
+                    continue
+            return True
         return False
 
     def scrape_products(
@@ -184,7 +242,7 @@ class ProductListScraper:
         Saves checkpoints and validates data per row.
         """
         # Hard cap for products: maximum 400 rows
-        product_hard_cap = getattr(settings, "MAX_PRODUCTS_PER_COUNTRY", 400) or 400
+        product_hard_cap = getattr(settings, "MAX_PRODUCTS_PER_COUNTRY", 300) or 300
         if max_limit is None or max_limit <= 0 or max_limit > product_hard_cap:
             max_limit = product_hard_cap
 
@@ -495,6 +553,12 @@ class ProductListScraper:
             else:
                 consecutive_stale_pages = 0
 
+            # Batas halaman: halaman 7+ butuh akun Enterprise di Kalodata ("Keanggotaan Diperlukan")
+            max_pages = getattr(settings, "MAX_PRODUCT_PAGES", 6) or 6
+            if page_number >= max_pages:
+                logger.info("Max product pages reached, stopping.", page=page_number, max_pages=max_pages, items_saved=len(items))
+                break
+
             # Pagination: look for 'Next' button
             try:
                 self._next_page_no = page_number + 1
@@ -556,9 +620,12 @@ class ProductListScraper:
                               btn.scroll_into_view_if_needed(timeout=2000)
                           except Exception:
                               pass
+                          hidden = self._uncover_pagination()
+                          if hidden:
+                              logger.info("Hid elements covering pagination", page=page_number, hidden=hidden[:5])
                           btn.click(force=True)
                           BaseScraper.pacing_page_delay()
-                          changed = self._wait_table_changed(sig_before)
+                          changed = self._wait_table_changed(sig_before, expected_page=page_number + 1)
                           if not changed:
                               # Tabel belum berganti: coba selector berikutnya (mis. tombol panah Next)
                               logger.warning(
@@ -580,6 +647,10 @@ class ProductListScraper:
                     pass
                 if clicked_next:
                     logger.info("Pagination list API responses", page=page_number, list_responses=list_responses[-4:])
+                if not clicked_next and self._is_last_page(page_number):
+                    # Halaman terakhir yang sah (produk >= min_sales sudah habis): berhenti normal, tanpa reload
+                    logger.info("Last page reached (no next page), stopping.", page=page_number, items_saved=len(items))
+                    break
                 if not clicked_next:
                     logger.warning(
                         "Pagination diagnostics (click did not change table)",

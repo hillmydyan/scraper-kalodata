@@ -42,7 +42,7 @@ def index():
         else:
             schedule_config = {
                 "time": "12:00",
-                "target_limit": 200,
+                "target_limit": 300,
                 "target_region": "ALL",
                 "module": "creator",
                 "auto_schedule": True,
@@ -62,7 +62,7 @@ def index():
             manual_config = dict(saved_manual.value)
         else:
             manual_config = {
-                "limit": schedule_config.get("target_limit", 200),
+                "limit": schedule_config.get("target_limit", 300),
                 "module": "creator",
                 "country": "ID",
             }
@@ -123,8 +123,8 @@ def save_schedule():
     except ValueError:
         target_limit = 400
 
-    if module == "product" and target_limit > 400:
-        target_limit = 400
+    if module == "product" and target_limit > settings.MAX_PRODUCTS_PER_COUNTRY:
+        target_limit = settings.MAX_PRODUCTS_PER_COUNTRY
 
     config_data = {
         "time": schedule_time,
@@ -271,8 +271,8 @@ def trigger_manual():
     except ValueError:
         limit = 400
 
-    if module == "product" and limit > 400:
-        limit = 400
+    if module == "product" and limit > settings.MAX_PRODUCTS_PER_COUNTRY:
+        limit = settings.MAX_PRODUCTS_PER_COUNTRY
 
     period_str = request.form.get("period")
     # Headless mode dihapus: browser selalu tampil di VNC
