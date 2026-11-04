@@ -68,6 +68,19 @@ def index():
                 "headless": "true"
             }
 
+        from app.services.scheduler_service import DEFAULT_CREATOR_SCHEDULE, CREATOR_SCHEDULE_KEY, DAY_NAMES_ID
+        saved_creator = db.get(Setting, CREATOR_SCHEDULE_KEY)
+        creator_config = dict(DEFAULT_CREATOR_SCHEDULE)
+        creator_config["enabled"] = False
+        if saved_creator and isinstance(saved_creator.value, dict):
+            creator_config.update(saved_creator.value)
+        c24 = parse_schedule_time(creator_config.get("time", "05:00")) or "05:00"
+        creator_config["selected_hour"], creator_config["selected_minute"] = c24.split(":")
+        try:
+            creator_config["day_of_week"] = int(creator_config.get("day_of_week", 6))
+        except (TypeError, ValueError):
+            creator_config["day_of_week"] = 6
+
         min_product_sales = JobService.get_min_product_sales(db)
         max_product_sales = JobService.get_max_product_sales(db)
         return render_template(
@@ -75,6 +88,8 @@ def index():
             jobs=jobs,
             default_period=today_str,
             schedule_config=schedule_config,
+            creator_config=creator_config,
+            day_names=DAY_NAMES_ID,
             manual_config=manual_config,
             min_product_sales=min_product_sales,
             max_product_sales=max_product_sales,
@@ -185,6 +200,54 @@ def save_schedule():
 
     return redirect(url_for("jobs.index"))
 
+
+@jobs_bp.route("/jobs/save-creator-schedule", methods=["POST"])
+@admin_required
+def save_creator_schedule():
+    from app.services.scheduler_service import CREATOR_SCHEDULE_KEY, DAY_NAMES_ID
+    from sqlalchemy.orm.attributes import flag_modified
+    try:
+        h_int = int(request.form.get("creator_hour", "5"))
+        m_int = int(request.form.get("creator_minute", "0"))
+        d_int = int(request.form.get("creator_day", "6"))
+        if not (0 <= h_int <= 23 and 0 <= m_int <= 59 and 0 <= d_int <= 6):
+            raise ValueError
+    except (TypeError, ValueError):
+        flash("Jadwal kreator tidak valid.", "danger")
+        return redirect(url_for("jobs.index"))
+
+    region = request.form.get("creator_region", "ALL")
+    if region not in ("ALL", "ID", "MY", "TH"):
+        region = "ALL"
+
+    db = SessionLocal()
+    try:
+        setting = db.get(Setting, CREATOR_SCHEDULE_KEY)
+        prev = dict(setting.value) if setting and isinstance(setting.value, dict) else {}
+        config_data = {
+            "enabled": request.form.get("creator_enabled") in ("on", "true", "1"),
+            "day_of_week": d_int,
+            "time": f"{h_int:02d}:{m_int:02d}",
+            "target_region": region,
+        }
+        if prev.get("last_run_date"):
+            config_data["last_run_date"] = prev["last_run_date"]
+        if not setting:
+            db.add(Setting(key=CREATOR_SCHEDULE_KEY, value=config_data, updated_by=current_user.username))
+        else:
+            setting.value = config_data
+            setting.updated_by = current_user.username
+            setting.updated_at = datetime.now(timezone.utc)
+            flag_modified(setting, "value")
+        db.commit()
+        flash(
+            f"Jadwal kreator mingguan disimpan: setiap {DAY_NAMES_ID[d_int]} {h_int:02d}:{m_int:02d} WIB"
+            + ("" if config_data["enabled"] else " (nonaktif)"),
+            "success",
+        )
+    finally:
+        db.close()
+    return redirect(url_for("jobs.index"))
 
 @jobs_bp.route("/jobs/trigger", methods=["POST"])
 @admin_required
