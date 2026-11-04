@@ -16,11 +16,25 @@ from sqlalchemy import select, desc
 
 from app.config import settings, APP_CONFIG
 from app.models import SessionLocal
-from app.models.entities import ScrapeJob, AccountProfile, ExportFile
+from app.models.entities import ScrapeJob, AccountProfile, ExportFile, Setting
 from app.routes.common import format_wib
 
 dashboard_bp = Blueprint("dashboard", __name__)
 
+
+
+def _product_schedule_label(db) -> str:
+    """Label jadwal produk dari setting dashboard (schedule_config), bukan jadwal bawaan kode."""
+    try:
+        st = db.get(Setting, "schedule_config")
+        cfg = st.value if st and isinstance(st.value, dict) else {}
+        if not cfg.get("auto_schedule", True):
+            return "Jadwal otomatis nonaktif"
+        from app.services.scheduler_service import parse_schedule_time
+        t = parse_schedule_time(cfg.get("time", "12:00")) or "12:00"
+        return f"Setiap hari pukul {t} WIB ({cfg.get('target_region', 'ALL')})"
+    except Exception:
+        return "-"
 
 @dashboard_bp.route("/")
 @login_required
@@ -82,7 +96,7 @@ def index():
             "db": "ONLINE",
             "redis": "ONLINE",
             "display": settings.KALODATA_DISPLAY,
-            "next_run_wib": f"Besok pukul {APP_CONFIG.get('app', {}).get('schedule_hour_wib', 1):02d}:00 WIB",
+            "next_run_wib": _product_schedule_label(db),
             "disk_free_mb": disk_free_mb,
             "total_exports_count": len(total_exports)
         }
