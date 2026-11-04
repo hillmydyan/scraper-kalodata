@@ -16,7 +16,7 @@ from app.services.job_service import JobService
 jobs_bp = Blueprint("jobs", __name__)
 
 
-from app.config import APP_CONFIG
+from app.config import APP_CONFIG, settings
 import zoneinfo
 
 WIB_TZ = zoneinfo.ZoneInfo("Asia/Jakarta")
