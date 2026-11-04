@@ -475,6 +475,8 @@ class JobService:
                     return
 
                 nav = KalodataNavigator(page)
+                stop_error_code = None
+                stop_error_summary = None
 
                 if job.module == "creator":
                     from app.scrapers.kalodata.creator_scraper import CreatorScraper
@@ -599,13 +601,33 @@ class JobService:
                             rows_scanned=scanned_count
                         )
 
+                    def recover_cb() -> bool:
+                        """Reload halaman produk & pasang ulang filter (dipakai saat pagination macet)."""
+                        try:
+                            page.goto(f"{settings.KALODATA_BASE_URL.rstrip('/')}/product", wait_until="domcontentloaded", timeout=40000)
+                            page.wait_for_timeout(6000)
+                            SessionManager.check_and_wait_for_challenge(page, job_id=job.id, cancel_check_cb=cancel_check)
+                            nav.ensure_ui_language(settings.KALODATA_UI_LANGUAGE)
+                            nav.switch_and_verify_region(job.country_code)
+                            nav.apply_date_range(job.period_start, job.period_end)
+                            nav.apply_category_filter(job.country_code)
+                            nav.apply_revenue_source_filter()
+                            if (min_sales and min_sales > 0) or (max_sales and max_sales > 0):
+                                nav.apply_sales_filter(min_sales, max_sales=max_sales)
+                            page.wait_for_timeout(4000)
+                            return True
+                        except Exception as rex:
+                            logger.warning("Recovery re-apply filters failed", error=str(rex)[:300])
+                            return False
+
                     scrape_res = list_scraper.scrape_products(
                         max_limit=effective_max,
                         min_sales=min_sales,
                         max_sales=max_sales,
                         checkpoint_cb=checkpoint_cb,
                         cancel_check_cb=cancel_check,
-                        revenue_source_method=rev_method
+                        revenue_source_method=rev_method,
+                        recover_cb=recover_cb
                     )
 
                     items = scrape_res["items"]
@@ -629,10 +651,19 @@ class JobService:
                         final_status = "PARTIAL"
 
                     is_truncated = scrape_res["is_truncated"]
+                    if scrape_res.get("stop_reason") == "PAGINATION_BLOCKED" and items and len(items) < effective_max:
+                        final_status = "PARTIAL"
+                        stop_error_code = "PAGINATION_BLOCKED"
+                        stop_error_summary = (
+                            f"Berhenti di {len(items)} produk: pindah ke halaman berikutnya tidak merespons "
+                            f"walau sudah reload & pasang ulang filter (dibatasi Kalodata / halaman macet). Cek screenshot pagination_stuck."
+                        )
 
                 cls.finalize_job(
                     db, job.id,
                     status=final_status,
+                    error_code=stop_error_code,
+                    error_summary=stop_error_summary,
                     meta_updates={
                         "revenue_source_method": rev_method,
                         "truncated": is_truncated,
