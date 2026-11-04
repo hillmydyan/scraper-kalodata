@@ -157,6 +157,23 @@ class ProductListScraper:
         except Exception:
             pass
 
+    def _is_last_page(self, page_number: int) -> bool:
+        """True kalau memang halaman terakhir: tidak ada tombol nomor > page_number dan tombol Next nonaktif/tidak ada."""
+        try:
+            return bool(self.page.evaluate("""(cur) => {
+                const btns = Array.from(document.querySelectorAll("[data-slot='pagination-link']"));
+                if (!btns.length) return true;
+                const nums = btns.map(b => parseInt((b.innerText || '').trim(), 10)).filter(n => !isNaN(n));
+                if (nums.some(n => n > cur)) return false;
+                const nxt = btns.find(b => /berikutnya|next/i.test(b.getAttribute('aria-label') || ''));
+                if (!nxt) return true;
+                const cls = (nxt.className || '').toString();
+                return nxt.disabled || nxt.getAttribute('aria-disabled') === 'true' || nxt.getAttribute('data-disabled') === 'true'
+                    || /pointer-events-none|opacity-50|is-disabled/.test(cls);
+            }""", page_number))
+        except Exception:
+            return False
+
     def _uncover_pagination(self) -> List[str]:
         """Sembunyikan elemen melayang (mis. widget chat AI Kalodata) yang menutupi tombol pagination.
         Ambil elemen di titik tengah tiap tombol; kalau bukan tombol itu sendiri, sembunyikan
@@ -630,6 +647,10 @@ class ProductListScraper:
                     pass
                 if clicked_next:
                     logger.info("Pagination list API responses", page=page_number, list_responses=list_responses[-4:])
+                if not clicked_next and self._is_last_page(page_number):
+                    # Halaman terakhir yang sah (produk >= min_sales sudah habis): berhenti normal, tanpa reload
+                    logger.info("Last page reached (no next page), stopping.", page=page_number, items_saved=len(items))
+                    break
                 if not clicked_next:
                     logger.warning(
                         "Pagination diagnostics (click did not change table)",
