@@ -58,6 +58,94 @@ class ProductListScraper:
         except Exception:
             return ""
 
+    def _set_page_size_50(self) -> None:
+        try:
+            page_size_trigger = self.page.locator('button[data-slot="select-trigger"]:has-text("Halaman"), button[data-slot="select-trigger"]:has-text("Page"), .el-pagination__sizes').first
+            if page_size_trigger.is_visible(timeout=3000):
+                page_size_trigger.click()
+                self.page.wait_for_timeout(500)
+                opt_50 = self.page.locator('[role="option"]:has-text("50"), [data-slot="select-item"]:has-text("50"), .el-select-dropdown__item:has-text("50")').first
+                if opt_50.is_visible(timeout=1500):
+                    opt_50.click()
+                    self.page.wait_for_timeout(3000)
+        except Exception:
+            pass
+
+    def _pagination_snapshot(self) -> Dict[str, Any]:
+        """Bukti kondisi halaman SEBELUM popup dihapus: dialog/popup, toast, tombol halaman, elemen yang menutupi tombol."""
+        try:
+            return self.page.evaluate("""(nextNo) => {
+                const vis = e => { const r = e.getBoundingClientRect(); const cs = getComputedStyle(e); return r.width > 0 && r.height > 0 && cs.visibility !== 'hidden' && cs.display !== 'none'; };
+                const dialogs = Array.from(document.querySelectorAll(".ant-modal-wrap, .ant-modal-root, [role='dialog'], [role='alertdialog'], [data-slot='dialog-content'], [data-slot='dialog-overlay'], .ModalFeatureMemberWrapper, [class*='vip' i], [class*='upgrade' i], [class*='member' i]"))
+                    .filter(vis).slice(0, 6).map(e => ((e.className || '').toString().slice(0, 60) + ' :: ' + (e.innerText || '').trim().slice(0, 200)));
+                const toasts = Array.from(document.querySelectorAll("[data-sonner-toast], .ant-message, .ant-notification, [role='status'], [role='alert']"))
+                    .map(e => (e.innerText || '').trim().slice(0, 200)).filter(Boolean).slice(0, 5);
+                const btns = Array.from(document.querySelectorAll("[data-slot='pagination-link']")).map(b => ({
+                    t: (b.innerText || '').trim() || b.getAttribute('aria-label'),
+                    active: b.getAttribute('data-active') || b.getAttribute('aria-current'),
+                    disabled: b.disabled || b.getAttribute('aria-disabled') === 'true',
+                    loading: b.getAttribute('data-loading')
+                }));
+                let cover = null;
+                const target = Array.from(document.querySelectorAll("[data-slot='pagination-link']")).find(b => (b.innerText || '').trim() === String(nextNo));
+                if (target) {
+                    const r = target.getBoundingClientRect();
+                    const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+                    if (hit && hit !== target && !target.contains(hit)) {
+                        cover = (hit.tagName + '.' + (hit.className || '').toString().slice(0, 80) + ' :: ' + (hit.innerText || '').trim().slice(0, 120));
+                    }
+                }
+                return {
+                    url: location.href,
+                    dialogs, toasts, buttons: btns, covered_by: cover,
+                    body_pointer_events: getComputedStyle(document.body).pointerEvents,
+                    body_overflow: getComputedStyle(document.body).overflow,
+                    rows: document.querySelectorAll('tbody tr').length
+                };
+            }""", self._next_page_no) or {}
+        except Exception as e:
+            return {"error": str(e)[:200]}
+
+    def _recover_to_page(self, target_page: int, recover_cb: Callable[[], bool]) -> bool:
+        """Reload halaman produk + pasang ulang filter (via recover_cb), lalu jalan ke target_page satu per satu."""
+        try:
+            logger.warning("Pagination recovery: reloading product page and re-applying filters", target_page=target_page)
+            if not recover_cb():
+                logger.warning("Pagination recovery: recover_cb failed")
+                return False
+            self.page.bring_to_front()
+            tbl_sel = sel("product_table")
+            for s_ in [tbl_sel["primary"]] + tbl_sel.get("fallbacks", []):
+                try:
+                    self.page.locator(s_).first.wait_for(timeout=15000)
+                    break
+                except Exception:
+                    pass
+            self._set_page_size_50()
+            current = 1
+            while current < target_page:
+                self._focus_list_tab()
+                try:
+                    self.page.keyboard.press("Escape")
+                except Exception:
+                    pass
+                before = self._page_signature()
+                btn = self.page.locator(f"button[data-slot='pagination-link']:text-is('{current + 1}')").first
+                if not btn.is_visible(timeout=3000):
+                    btn = self.page.locator("button[data-slot='pagination-link'][aria-label*='berikutnya' i], button[data-slot='pagination-link'][aria-label*='next' i]").first
+                btn.click(timeout=8000)
+                if not self._wait_table_changed(before):
+                    logger.warning("Pagination recovery: table did not change", step_to=current + 1, snapshot=self._pagination_snapshot())
+                    return False
+                current += 1
+                self.page.wait_for_timeout(1500)
+            ok = self._active_page_label() in ("", str(target_page))
+            logger.info("Pagination recovery finished", target_page=target_page, active_page_ui=self._active_page_label(), ok=ok)
+            return ok
+        except Exception as e:
+            logger.warning("Pagination recovery error", error=str(e)[:300])
+            return False
+
     def _focus_list_tab(self) -> None:
         """Bawa tab tabel produk ke depan (tab detail sering bikin tab ini di-throttle Chrome)."""
         try:
@@ -88,7 +176,8 @@ class ProductListScraper:
         max_sales: Optional[int] = None,
         checkpoint_cb: Optional[Callable[[List[Dict[str, Any]], int], None]] = None,
         cancel_check_cb: Optional[Callable[[], bool]] = None,
-        revenue_source_method: str = "product_filter"
+        revenue_source_method: str = "product_filter",
+        recover_cb: Optional[Callable[[], bool]] = None
     ) -> Dict[str, Any]:
         """
         Iterates product table rows up to max_limit (hard-capped at MAX_PRODUCTS_PER_COUNTRY, default 400).
@@ -104,6 +193,31 @@ class ProductListScraper:
         seen_product_ids = set()
         consecutive_stale_pages = 0
         is_truncated = False
+        stop_reason: Optional[str] = None
+        recoveries_used = 0
+        self._next_page_no = 2
+        console_errors: List[str] = []
+
+        def _on_console(msg):
+            try:
+                if msg.type in ("error", "warning"):
+                    console_errors.append(f"{msg.type}: {msg.text[:200]}")
+                    del console_errors[:-15]
+            except Exception:
+                pass
+
+        def _on_pageerror(err):
+            try:
+                console_errors.append(f"pageerror: {str(err)[:200]}")
+                del console_errors[:-15]
+            except Exception:
+                pass
+
+        try:
+            self.page.on("console", _on_console)
+            self.page.on("pageerror", _on_pageerror)
+        except Exception:
+            pass
 
         self.dismiss_overlays()
 
@@ -383,6 +497,8 @@ class ProductListScraper:
 
             # Pagination: look for 'Next' button
             try:
+                self._next_page_no = page_number + 1
+                pre_snapshot = self._pagination_snapshot()  # sebelum popup dihapus
                 self.dismiss_overlays()
                 next_selectors = [
                     f"button[data-slot='pagination-link']:text-is('{page_number + 1}')",
@@ -465,6 +581,33 @@ class ProductListScraper:
                 if clicked_next:
                     logger.info("Pagination list API responses", page=page_number, list_responses=list_responses[-4:])
                 if not clicked_next:
+                    logger.warning(
+                        "Pagination diagnostics (click did not change table)",
+                        page=page_number,
+                        list_responses=list_responses[-6:],
+                        snapshot_before_dismiss=pre_snapshot,
+                        snapshot_now=self._pagination_snapshot(),
+                        console_errors=console_errors[-10:],
+                    )
+                    try:
+                        from app.config import settings as _s
+                        shot = _s.RUNTIME_DIR / "screenshots" / f"{self.job_id or 'nojob'}_pagination_stuck_{self.country_code}_p{page_number}.png"
+                        shot.parent.mkdir(parents=True, exist_ok=True)
+                        self.page.screenshot(path=str(shot))
+                    except Exception:
+                        pass
+                    if recover_cb and recoveries_used < 2:
+                        recoveries_used += 1
+                        if self._recover_to_page(page_number + 1, recover_cb):
+                            clicked_next = True
+                            page_number += 1
+                            consecutive_stale_pages = 0
+                            logger.info("Pagination recovered after reload", page=page_number, recoveries_used=recoveries_used)
+                        else:
+                            stop_reason = "PAGINATION_BLOCKED"
+                    else:
+                        stop_reason = "PAGINATION_BLOCKED"
+                if not clicked_next:
                     logger.info("Next page button disabled/absent or table did not change. Stopping.", total_scanned=total_scanned, current_page=page_number, items_saved=len(items), list_responses=list_responses[-6:])
                     try:
                         from app.config import settings as _s
@@ -489,7 +632,8 @@ class ProductListScraper:
             "items": items,
             "rejected": rejected,
             "total_scanned": total_scanned,
-            "is_truncated": is_truncated
+            "is_truncated": is_truncated,
+            "stop_reason": stop_reason
         }
 
     def _extract_row_data(self, row) -> Optional[Dict[str, Any]]:
