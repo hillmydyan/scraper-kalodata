@@ -58,6 +58,16 @@ class ProductListScraper:
         except Exception:
             return ""
 
+    def _focus_list_tab(self) -> None:
+        """Bawa tab tabel produk ke depan (tab detail sering bikin tab ini di-throttle Chrome)."""
+        try:
+            self.page.bring_to_front()
+            self.page.wait_for_timeout(800)
+            self.page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+            self.page.wait_for_timeout(500)
+        except Exception:
+            pass
+
     def _wait_table_changed(self, old_sig: str, timeout_ms: int = 20000) -> bool:
         """Tunggu sampai isi tabel benar-benar berganti setelah klik pindah halaman."""
         waited = 0
@@ -387,45 +397,75 @@ class ProductListScraper:
                     "button:has-text('Next')"
                 ]
                 clicked_next = False
+                self._focus_list_tab()
                 sig_before = self._page_signature()
-                for n_sel in next_selectors:
-                    btn = self.page.locator(n_sel).first
-                    if btn.is_visible(timeout=1000):
-                        if btn.is_disabled():
-                            continue
-                        aria_dis = btn.get_attribute("aria-disabled")
-                        data_dis = btn.get_attribute("data-disabled")
-                        if aria_dis == "true" or data_dis == "true":
-                            continue
-                        cls_tokens = set((btn.get_attribute("class") or "").split())
-                        # Guard against Tailwind 'disabled:...' classes; only skip if actually disabled
-                        if "pointer-events-none" in cls_tokens or "opacity-50" in cls_tokens or "disabled" in cls_tokens or "is-disabled" in cls_tokens:
-                            continue
-                        self.dismiss_overlays()
-                        try:
-                            btn.scroll_into_view_if_needed(timeout=2000)
-                        except Exception:
-                            pass
-                        btn.click(force=True)
-                        BaseScraper.pacing_page_delay()
-                        changed = self._wait_table_changed(sig_before)
-                        if not changed:
-                            # Tabel belum berganti: coba selector berikutnya (mis. tombol panah Next)
-                            logger.warning(
-                                "Table did not change after clicking pagination, trying next selector",
-                                selector=n_sel,
-                                page=page_number,
-                                active_page_ui=self._active_page_label(),
-                            )
-                            continue
-                        clicked_next = True
-                        self.dismiss_overlays()
-                        page_number += 1
-                        logger.info("Moved to next page", page=page_number, selector=n_sel, active_page_ui=self._active_page_label())
-                        break
+                list_responses: List[Dict[str, Any]] = []
 
+                def _on_list_resp(r):
+                    try:
+                        if "/product/queryList" in r.url:
+                            import json as _json
+                            req = _json.loads(r.request.post_data or "{}")
+                            list_responses.append({"pageNo": req.get("pageNo"), "pageSize": req.get("pageSize"), "status": r.status})
+                    except Exception:
+                        pass
+
+                try:
+                    self.page.on("response", _on_list_resp)
+                except Exception:
+                    pass
+                for attempt in range(2):
+                  if clicked_next:
+                      break
+                  if attempt == 1:
+                      logger.warning("Retrying pagination after refocusing list tab", page=page_number, list_responses=list_responses[-4:])
+                      self._focus_list_tab()
+                      self.page.wait_for_timeout(3000)
+                      sig_before = self._page_signature() or sig_before
+                  for n_sel in next_selectors:
+                      btn = self.page.locator(n_sel).first
+                      if btn.is_visible(timeout=1000):
+                          if btn.is_disabled():
+                              continue
+                          aria_dis = btn.get_attribute("aria-disabled")
+                          data_dis = btn.get_attribute("data-disabled")
+                          if aria_dis == "true" or data_dis == "true":
+                              continue
+                          cls_tokens = set((btn.get_attribute("class") or "").split())
+                          # Guard against Tailwind 'disabled:...' classes; only skip if actually disabled
+                          if "pointer-events-none" in cls_tokens or "opacity-50" in cls_tokens or "disabled" in cls_tokens or "is-disabled" in cls_tokens:
+                              continue
+                          self.dismiss_overlays()
+                          try:
+                              btn.scroll_into_view_if_needed(timeout=2000)
+                          except Exception:
+                              pass
+                          btn.click(force=True)
+                          BaseScraper.pacing_page_delay()
+                          changed = self._wait_table_changed(sig_before)
+                          if not changed:
+                              # Tabel belum berganti: coba selector berikutnya (mis. tombol panah Next)
+                              logger.warning(
+                                  "Table did not change after clicking pagination, trying next selector",
+                                  selector=n_sel,
+                                  page=page_number,
+                                  active_page_ui=self._active_page_label(),
+                              )
+                              continue
+                          clicked_next = True
+                          self.dismiss_overlays()
+                          page_number += 1
+                          logger.info("Moved to next page", page=page_number, selector=n_sel, active_page_ui=self._active_page_label())
+                          break
+
+                try:
+                    self.page.remove_listener("response", _on_list_resp)
+                except Exception:
+                    pass
+                if clicked_next:
+                    logger.info("Pagination list API responses", page=page_number, list_responses=list_responses[-4:])
                 if not clicked_next:
-                    logger.info("Next page button disabled/absent or table did not change. Stopping.", total_scanned=total_scanned, current_page=page_number, items_saved=len(items))
+                    logger.info("Next page button disabled/absent or table did not change. Stopping.", total_scanned=total_scanned, current_page=page_number, items_saved=len(items), list_responses=list_responses[-6:])
                     try:
                         from app.config import settings as _s
                         shot = _s.RUNTIME_DIR / "screenshots" / f"{self.job_id or 'nojob'}_pagination_stop_{self.country_code}_p{page_number}.png"

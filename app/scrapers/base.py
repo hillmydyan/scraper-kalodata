@@ -193,10 +193,14 @@ class BaseScraper:
             "--disable-infobars",
             "--no-first-run",
             "--no-default-browser-check",
-            "--disable-features=Translate,OptimizationHints,MediaRouter",
+            "--disable-features=Translate,OptimizationHints,MediaRouter,IntensiveWakeUpThrottling,CalculateNativeWinOcclusion",
             "--disable-background-networking",
             "--disable-default-apps",
             "--disable-sync",
+            # Tab tabel produk lama di belakang (detail dibuka di tab lain) -> jangan di-throttle Chrome
+            "--disable-background-timer-throttling",
+            "--disable-backgrounding-occluded-windows",
+            "--disable-renderer-backgrounding",
             # Jendela pas dengan layar VNC (1920x1080) di pojok kiri atas,
             # supaya tab bar, address bar & pagination bawah kelihatan.
             f"--window-size={os.getenv('KALODATA_WINDOW_WIDTH', '1920')},{os.getenv('KALODATA_WINDOW_HEIGHT', '1080')}",
