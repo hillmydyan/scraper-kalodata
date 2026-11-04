@@ -225,7 +225,7 @@ class ProductListScraper:
         Saves checkpoints and validates data per row.
         """
         # Hard cap for products: maximum 400 rows
-        product_hard_cap = getattr(settings, "MAX_PRODUCTS_PER_COUNTRY", 400) or 400
+        product_hard_cap = getattr(settings, "MAX_PRODUCTS_PER_COUNTRY", 300) or 300
         if max_limit is None or max_limit <= 0 or max_limit > product_hard_cap:
             max_limit = product_hard_cap
 
@@ -535,6 +535,12 @@ class ProductListScraper:
                     break
             else:
                 consecutive_stale_pages = 0
+
+            # Batas halaman: halaman 7+ butuh akun Enterprise di Kalodata ("Keanggotaan Diperlukan")
+            max_pages = getattr(settings, "MAX_PRODUCT_PAGES", 6) or 6
+            if page_number >= max_pages:
+                logger.info("Max product pages reached, stopping.", page=page_number, max_pages=max_pages, items_saved=len(items))
+                break
 
             # Pagination: look for 'Next' button
             try:
