@@ -1,7 +1,5 @@
 app:
   timezone: "Asia/Jakarta"
-  schedule_cron: "0 1 * * *"
-  schedule_hour_wib: 1
   min_free_disk_mb: 2000
   session_check_interval_hours: 6
   kalodata_ui_language: "en"

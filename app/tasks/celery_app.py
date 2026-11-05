@@ -39,10 +39,9 @@ celery_app.conf.update(
 
 # Scheduled tasks (Celery Beat) (§8.1, §8.2)
 celery_app.conf.beat_schedule = {
-    "daily-kalodata-run": {
-        "task": "app.tasks.celery_app.run_daily_pipeline",
-        "schedule": crontab(hour=APP_CONFIG.get("app", {}).get("schedule_hour_wib", 1), minute=0),
-    },
+    # Jadwal bawaan 01:00 WIB (daily-kalodata-run) dihapus: jadwal produk & kreator
+    # hanya diatur dari dashboard (check-custom-schedule). run_daily_pipeline tetap ada
+    # sebagai task yang bisa dipanggil manual.
     "check-custom-schedule": {
         "task": "app.tasks.celery_app.check_and_run_scheduled_pipeline",
         "schedule": crontab(minute="*"),

@@ -645,8 +645,7 @@ class JobService:
                     final_status = "SUCCESS"
                     if not items:
                         final_status = "NO_DATA"
-                    elif scrape_res["is_truncated"]:
-                        final_status = "PARTIAL"
+                    # is_truncated = berhenti karena sudah mencapai limit produk (mis. 300) -> itu target, tetap SUCCESS
                     elif len(rejected) / max(scrape_res["total_scanned"], 1) > settings.MAX_REJECT_RATIO:
                         final_status = "PARTIAL"
 
