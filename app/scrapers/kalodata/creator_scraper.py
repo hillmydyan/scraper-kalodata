@@ -49,6 +49,31 @@ class CreatorScraper:
         except Exception:
             pass
 
+    def _uncover_pagination(self) -> List[str]:
+        """Sembunyikan elemen melayang (mis. widget chat AI Kalodata) yang menutupi tombol pagination."""
+        try:
+            return self.page.evaluate("""() => {
+                const hidden = [];
+                for (const b of document.querySelectorAll("[data-slot='pagination-link']")) {
+                    const r = b.getBoundingClientRect();
+                    if (r.width === 0 || r.height === 0) continue;
+                    const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+                    if (!hit || hit === b || b.contains(hit) || hit.contains(b)) continue;
+                    let el = hit, victim = hit;
+                    while (el && el !== document.body) {
+                        const pos = getComputedStyle(el).position;
+                        if (pos === 'fixed' || pos === 'sticky') { victim = el; break; }
+                        el = el.parentElement;
+                    }
+                    if (victim.contains(b)) continue;
+                    victim.style.setProperty('display', 'none', 'important');
+                    hidden.push(victim.tagName + '.' + (victim.className || '').toString().slice(0, 60));
+                }
+                return hidden;
+            }""") or []
+        except Exception:
+            return []
+
     def apply_filters(self, date_preset: str = "7_days") -> bool:
         """
         Applies:
@@ -618,6 +643,13 @@ class CreatorScraper:
                             if "pointer-events-none" in cls_tokens or "opacity-50" in cls_tokens or "disabled" in cls_tokens or "is-disabled" in cls_tokens:
                                 continue
                             self.dismiss_overlays()
+                            try:
+                                btn.scroll_into_view_if_needed(timeout=2000)
+                            except Exception:
+                                pass
+                            hidden = self._uncover_pagination()
+                            if hidden:
+                                logger.info("Hid elements covering creator pagination", page=page_number, hidden=hidden[:5])
                             btn.click(force=True)
                             clicked_next = True
 
