@@ -673,6 +673,11 @@ class JobService:
                 # Export Excel
                 ExportService.export_job_results(db, job.id)
 
+                # Insight harian (bandingkan vs periode sebelumnya + ringkasan AI). Tidak boleh menggagalkan job.
+                if job.module == "product" and final_status in ("SUCCESS", "PARTIAL"):
+                    from app.services.insight_service import safe_build_after_job
+                    safe_build_after_job(db, job.country_code, job.period_start)
+
             except NavigationError as ne:
                 logger.warning("Navigation error during scraping", error=str(ne), code=ne.error_code)
                 try:
