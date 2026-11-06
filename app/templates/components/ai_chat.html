@@ -1,0 +1,106 @@
+<!-- Asisten AI: widget chat pojok kanan bawah. Analisa hanya dibuat saat ditanya. -->
+<style>
+  #aiFab { position: fixed; right: 22px; bottom: 22px; z-index: 9998; width: 56px; height: 56px; border-radius: 50%;
+    background: var(--color-primary); color: #fff; border: none; cursor: pointer; box-shadow: 0 6px 20px rgba(0,0,0,.22);
+    font-weight: 800; font-size: .95rem; }
+  #aiFab:hover { background: var(--color-primary-hover); }
+  #aiPanel { position: fixed; right: 22px; bottom: 90px; z-index: 9999; width: 380px; max-width: calc(100vw - 32px);
+    height: 540px; max-height: calc(100vh - 120px); background: var(--color-surface); border: 1px solid var(--color-border);
+    border-radius: 14px; box-shadow: 0 12px 40px rgba(0,0,0,.25); display: none; flex-direction: column; overflow: hidden; }
+  #aiPanel.open { display: flex; }
+  #aiHead { background: var(--color-primary); color: #fff; padding: .7rem .9rem; display: flex; justify-content: space-between; align-items: center; }
+  #aiHead b { font-size: .95rem; } #aiHead small { opacity: .75; font-size: .72rem; display: block; }
+  #aiHead button { background: transparent; border: none; color: #fff; cursor: pointer; font-size: .8rem; margin-left: .4rem; }
+  #aiMsgs { flex: 1; overflow-y: auto; padding: .8rem; display: flex; flex-direction: column; gap: .55rem; background: var(--color-surface-hover); }
+  .ai-m { max-width: 88%; padding: .55rem .75rem; border-radius: 12px; font-size: .86rem; line-height: 1.5; white-space: pre-wrap; word-wrap: break-word; }
+  .ai-m.user { align-self: flex-end; background: var(--color-primary); color: #fff; border-bottom-right-radius: 4px; }
+  .ai-m.assistant { align-self: flex-start; background: var(--color-surface); border: 1px solid var(--color-border); color: var(--color-text); border-bottom-left-radius: 4px; }
+  .ai-m.assistant a { color: var(--color-primary); text-decoration: underline; }
+  .ai-m.err { border-color: var(--color-danger); }
+  #aiSug { display: flex; flex-wrap: wrap; gap: .35rem; padding: 0 .8rem .5rem; background: var(--color-surface-hover); }
+  #aiSug button { font-size: .72rem; border: 1px solid var(--color-border); background: var(--color-surface); border-radius: 999px; padding: .25rem .6rem; cursor: pointer; color: var(--color-text); }
+  #aiForm { display: flex; gap: .4rem; padding: .6rem; border-top: 1px solid var(--color-border); }
+  #aiInput { flex: 1; resize: none; border: 1px solid var(--color-border); border-radius: 10px; padding: .5rem .6rem; font-size: .86rem; max-height: 110px; font-family: inherit; }
+  #aiSend { background: var(--color-primary); color: #fff; border: none; border-radius: 10px; padding: 0 .9rem; cursor: pointer; font-weight: 700; }
+  #aiSend:disabled { opacity: .5; cursor: wait; }
+</style>
+
+<button id="aiFab" type="button" title="Asisten AI" aria-label="Buka Asisten AI">AI</button>
+<div id="aiPanel" role="dialog" aria-label="Asisten AI">
+  <div id="aiHead">
+    <div><b>Asisten AI</b><small id="aiModel">Tanya soal data scraping</small></div>
+    <div><button type="button" id="aiClear" title="Hapus percakapan">Reset</button><button type="button" id="aiClose" title="Tutup">✕</button></div>
+  </div>
+  <div id="aiMsgs"></div>
+  <div id="aiSug">
+    <button type="button">Produk baru di ID hari ini apa aja?</button>
+    <button type="button">Top 10 revenue TH</button>
+    <button type="button">Produk komisi ≥10% di MY</button>
+  </div>
+  <form id="aiForm">
+    <textarea id="aiInput" rows="1" placeholder="Tulis pertanyaan… (Enter kirim, Shift+Enter baris baru)"></textarea>
+    <button id="aiSend" type="submit">Kirim</button>
+  </form>
+</div>
+
+<script>
+(function () {
+  const KEY = 'kurmaAiChat';
+  const csrf = "{{ csrf_token() }}";
+  const fab = document.getElementById('aiFab'), panel = document.getElementById('aiPanel');
+  const box = document.getElementById('aiMsgs'), form = document.getElementById('aiForm');
+  const input = document.getElementById('aiInput'), send = document.getElementById('aiSend');
+  let msgs = [];
+  try { msgs = JSON.parse(sessionStorage.getItem(KEY) || '[]'); } catch (e) { msgs = []; }
+
+  function esc(s) { return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+  function fmt(s) {
+    let h = esc(s);
+    h = h.replace(/\*\*(.+?)\*\*/g, '<b>$1</b>');
+    h = h.replace(/(https?:\/\/[^\s<)]+)/g, '<a href="$1" target="_blank" rel="noopener">link</a>');
+    return h;
+  }
+  function add(role, text, err) {
+    const d = document.createElement('div');
+    d.className = 'ai-m ' + role + (err ? ' err' : '');
+    d.innerHTML = role === 'assistant' ? fmt(text) : esc(text);
+    box.appendChild(d); box.scrollTop = box.scrollHeight; return d;
+  }
+  function render() {
+    box.innerHTML = '';
+    if (!msgs.length) add('assistant', 'Halo! Tanya apa saja soal data produk Kalodata (ID/MY/TH). Aku cuma menganalisa kalau kamu minta.');
+    msgs.forEach(m => add(m.role, m.content));
+    document.getElementById('aiSug').style.display = msgs.length ? 'none' : 'flex';
+  }
+  function save() { sessionStorage.setItem(KEY, JSON.stringify(msgs.slice(-20))); }
+
+  fab.onclick = () => { panel.classList.toggle('open'); if (panel.classList.contains('open')) { render(); input.focus(); } };
+  document.getElementById('aiClose').onclick = () => panel.classList.remove('open');
+  document.getElementById('aiClear').onclick = () => { msgs = []; save(); render(); };
+  document.querySelectorAll('#aiSug button').forEach(b => b.onclick = () => { input.value = b.textContent; form.requestSubmit(); });
+  input.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); form.requestSubmit(); } });
+
+  fetch("{{ url_for('ai_chat.status') }}").then(r => r.json()).then(s => {
+    document.getElementById('aiModel').textContent = s.enabled ? ('Model: ' + s.model) : 'AI belum aktif';
+  }).catch(() => {});
+
+  form.onsubmit = async (e) => {
+    e.preventDefault();
+    const q = input.value.trim(); if (!q || send.disabled) return;
+    input.value = ''; msgs.push({role: 'user', content: q}); save(); render();
+    send.disabled = true;
+    const wait = add('assistant', 'Sedang mengecek data…');
+    try {
+      const r = await fetch("{{ url_for('ai_chat.chat') }}", {
+        method: 'POST', headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrf},
+        body: JSON.stringify({messages: msgs})
+      });
+      const j = await r.json();
+      wait.remove();
+      if (j.ok) { msgs.push({role: 'assistant', content: j.reply}); save(); add('assistant', j.reply); }
+      else add('assistant', j.reply || 'Gagal.', true);
+    } catch (err) { wait.remove(); add('assistant', 'Koneksi gagal, coba lagi.', true); }
+    send.disabled = false; input.focus();
+  };
+})();
+</script>

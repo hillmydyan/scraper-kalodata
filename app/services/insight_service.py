@@ -169,7 +169,7 @@ def summarize(diff: Dict[str, Any]) -> Optional[str]:
     ])
 
 
-def build_insight(db, country: str, period: date, with_ai: bool = True) -> DailyProductInsight:
+def build_insight(db, country: str, period: date, with_ai: bool = False) -> DailyProductInsight:
     """Hitung diff, (opsional) minta ringkasan AI, simpan/replace ke daily_product_insights."""
     diff = compute_diff(db, country, period)
     summary = summarize(diff) if with_ai else None
@@ -200,7 +200,7 @@ def build_insight(db, country: str, period: date, with_ai: bool = True) -> Daily
 def safe_build_after_job(db, country: str, period: date) -> None:
     """Dipanggil setelah job produk selesai. Tidak boleh menggagalkan job."""
     try:
-        build_insight(db, country, period)
+        build_insight(db, country, period, with_ai=False)
     except Exception as e:
         try:
             db.rollback()

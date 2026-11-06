@@ -7,7 +7,7 @@ import json
 import os
 import urllib.request
 import urllib.error
-from typing import List, Dict, Optional
+from typing import Any, List, Dict, Optional
 
 import structlog
 
@@ -30,6 +30,35 @@ def is_enabled() -> bool:
 
 def model_name() -> str:
     return _cfg()["model"]
+
+
+def chat_message(messages: List[Dict[str, Any]], tools: Optional[List[Dict[str, Any]]] = None,
+                 temperature: float = 0.2, max_tokens: int = 1500) -> Optional[Dict[str, Any]]:
+    """Chat completion dengan dukungan tools. Return message dict (content/tool_calls) atau None."""
+    c = _cfg()
+    if not (c["api_key"] and c["model"]):
+        return None
+    payload: Dict[str, Any] = {
+        "model": c["model"], "messages": messages, "temperature": temperature,
+        "max_tokens": max_tokens, "stream": False,
+    }
+    if tools:
+        payload["tools"] = tools
+    req = urllib.request.Request(
+        f"{c['base_url']}/chat/completions",
+        data=json.dumps(payload, default=str).encode("utf-8"),
+        headers={"Content-Type": "application/json", "Authorization": f"Bearer {c['api_key']}"},
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=c["timeout"]) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+        return (data.get("choices") or [{}])[0].get("message") or {}
+    except urllib.error.HTTPError as e:
+        logger.warning("LLM request failed", status=e.code, body=e.read().decode("utf-8", "ignore")[:300])
+    except Exception as e:
+        logger.warning("LLM request error", error=str(e)[:300])
+    return None
 
 
 def chat(messages: List[Dict[str, str]], temperature: float = 0.3, max_tokens: int = 1500) -> Optional[str]:

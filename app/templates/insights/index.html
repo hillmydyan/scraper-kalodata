@@ -51,7 +51,7 @@
   <div>
     <h1 style="font-size: 1.7rem; font-weight: 800; color: var(--color-text); letter-spacing: -0.02em;">Insight Harian Produk</h1>
     <p style="color: var(--color-text-muted); font-size: 0.92rem; max-width: 720px; line-height: 1.5;">
-      Perbandingan hasil scraping produk dengan periode sebelumnya: produk baru, produk hilang, lonjakan revenue, dan toko yang makin dominan. Angka dihitung sistem; ringkasan ditulis AI.
+      Perbandingan hasil scraping produk dengan periode sebelumnya: produk baru, produk hilang, lonjakan revenue, dan toko yang makin dominan. Angka dihitung sistem. Analisa AI hanya lewat chat, kalau diminta.
     </p>
   </div>
   <form method="get" style="display: flex; gap: 0.6rem; align-items: center;">
@@ -90,27 +90,17 @@
   </div>
 </div>
 
-<div class="card-kurma" style="margin-bottom: 1.5rem;">
-  <div style="display: flex; justify-content: space-between; align-items: center; gap: 1rem; flex-wrap: wrap; margin-bottom: 0.75rem;">
-    <h2 style="font-size: 1.1rem; font-weight: 800;">Ringkasan AI</h2>
-    <form method="post" action="{{ url_for('insights.rebuild') }}">
-      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-      <input type="hidden" name="country" value="{{ selected_country }}"/>
-      <input type="hidden" name="period" value="{{ selected_period.isoformat() }}"/>
-      <button type="submit" class="btn-kurma-secondary">Hitung ulang{% if ai_enabled %} + ringkasan AI{% endif %}</button>
-    </form>
+<div class="card-kurma" style="margin-bottom: 1.5rem; display: flex; justify-content: space-between; align-items: center; gap: 1rem; flex-wrap: wrap;">
+  <div style="font-size: 0.88rem; color: var(--color-text-muted);">
+    Data {{ diff.period }} dibandingkan dengan {{ diff.compared_period or '— (belum ada data sebelumnya)' }}.
+    {% if ai_enabled %}Butuh analisa? Tanya <strong>Asisten AI</strong> di pojok kanan bawah.{% endif %}
   </div>
-  <div style="font-size: 0.85rem; color: var(--color-text-muted); margin-bottom: 0.75rem;">
-    Data {{ diff.period }} dibandingkan dengan {{ diff.compared_period or '— (belum ada data sebelumnya)' }}
-    {% if insight.ai_model %} · model {{ insight.ai_model }}{% endif %}
-  </div>
-  {% if insight.ai_summary %}
-  <div style="white-space: pre-wrap; line-height: 1.6; font-size: 0.93rem;">{{ insight.ai_summary }}</div>
-  {% elif not ai_enabled %}
-  <p style="color: var(--color-text-muted);">AI belum aktif. Set <code>LLM_API_KEY</code> dan <code>LLM_MODEL</code> di .env untuk ringkasan otomatis.</p>
-  {% else %}
-  <p style="color: var(--color-text-muted);">Belum ada ringkasan. Klik "Hitung ulang + ringkasan AI".</p>
-  {% endif %}
+  <form method="post" action="{{ url_for('insights.rebuild') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+    <input type="hidden" name="country" value="{{ selected_country }}"/>
+    <input type="hidden" name="period" value="{{ selected_period.isoformat() }}"/>
+    <button type="submit" class="btn-kurma-secondary">Hitung ulang</button>
+  </form>
 </div>
 
 <div class="card-kurma" style="margin-bottom: 1.5rem;">

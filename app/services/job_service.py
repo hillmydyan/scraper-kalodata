@@ -673,7 +673,7 @@ class JobService:
                 # Export Excel
                 ExportService.export_job_results(db, job.id)
 
-                # Insight harian (bandingkan vs periode sebelumnya + ringkasan AI). Tidak boleh menggagalkan job.
+                # Insight harian (hanya perbandingan angka, TANPA AI; AI hanya lewat chat bila diminta).
                 if job.module == "product" and final_status in ("SUCCESS", "PARTIAL"):
                     from app.services.insight_service import safe_build_after_job
                     safe_build_after_job(db, job.country_code, job.period_start)
