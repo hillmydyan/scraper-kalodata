@@ -257,6 +257,26 @@ class DiagnosticScreenshot(Base):
     deleted_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
+class DailyProductInsight(Base):
+    """Hasil perbandingan produk 1 hari vs hari sebelumnya (per region) + ringkasan AI."""
+    __tablename__ = "daily_product_insights"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    country_code: Mapped[str] = mapped_column(String(10), nullable=False)
+    period_start: Mapped[date] = mapped_column(Date, nullable=False)
+    compared_period: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    diff: Mapped[Dict[str, Any]] = mapped_column(JSON, default=dict)
+    ai_summary: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    ai_model: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=datetime.utcnow, onupdate=datetime.utcnow
+    )
+
+    __table_args__ = (
+        UniqueConstraint("country_code", "period_start", name="uq_insight_country_period"),
+    )
+
 class Setting(Base):
     __tablename__ = "settings"
 

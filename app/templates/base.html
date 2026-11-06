@@ -60,6 +60,13 @@
             <span style="margin-left: auto; background: var(--color-accent-emerald); color: #073B32; font-size: 0.65rem; font-weight: 800; padding: 2px 6px; border-radius: 9999px;">AI</span>
           </a>
         </li>
+        <li>
+          <a href="{{ url_for('insights.index') }}" class="menu-link {% if request.blueprint == 'insights' %}active{% endif %}">
+            {{ icon('analytics', 19) }}
+            <span>Insight Harian</span>
+            <span style="margin-left: auto; background: var(--color-accent-emerald); color: #073B32; font-size: 0.65rem; font-weight: 800; padding: 2px 6px; border-radius: 9999px;">AI</span>
+          </a>
+        </li>
       </ul>
 
       <!-- Admin Tools -->

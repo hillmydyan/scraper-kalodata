@@ -1,0 +1,152 @@
+{% extends "base.html" %}
+{% from "components/icons.html" import icon %}
+
+{% block title %}Insight Harian — Kurma Scraper{% endblock %}
+
+{% macro money(v, cur) -%}
+{{ cur or '' }} {{ "{:,.0f}".format(v or 0) }}
+{%- endmacro %}
+
+{% macro pct(v) -%}
+{% if v is none %}-{% elif v > 0 %}<span style="color: var(--color-success); font-weight:700;">+{{ v }}%</span>{% else %}<span style="color: var(--color-danger); font-weight:700;">{{ v }}%</span>{% endif %}
+{%- endmacro %}
+
+{% macro product_table(items, mode, cur) %}
+{% if items %}
+<div class="table-wrapper">
+  <table class="kurma-table">
+    <thead>
+      <tr>
+        <th>#</th><th>Produk</th><th>Toko</th><th>Revenue</th><th>Sales</th>
+        {% if mode == 'move' %}<th>Revenue sebelumnya</th><th>Perubahan</th><th>Rank</th>{% else %}<th>Komisi</th>{% endif %}
+      </tr>
+    </thead>
+    <tbody>
+      {% for p in items %}
+      <tr>
+        <td>{{ p.rank }}</td>
+        <td style="max-width: 360px;">{% if p.url %}<a href="{{ p.url }}" target="_blank" rel="noopener">{{ p.name }}</a>{% else %}{{ p.name }}{% endif %}</td>
+        <td>{{ p.shop }}</td>
+        <td>{{ money(p.revenue, cur) }}</td>
+        <td>{{ "{:,}".format(p.sales or 0) }}</td>
+        {% if mode == 'move' %}
+        <td>{{ money(p.prev_revenue, cur) }}</td>
+        <td>{{ pct(p.revenue_change_pct) }}</td>
+        <td>{{ p.prev_rank }} &rarr; {{ p.rank }}</td>
+        {% else %}
+        <td>{% if p.commission is not none %}{{ "%.1f"|format(p.commission * 100) }}%{% else %}-{% endif %}</td>
+        {% endif %}
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<p style="color: var(--color-text-muted); font-size: 0.9rem;">Tidak ada.</p>
+{% endif %}
+{% endmacro %}
+
+{% block content %}
+<div style="margin-bottom: 1.5rem; display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: 1rem;">
+  <div>
+    <h1 style="font-size: 1.7rem; font-weight: 800; color: var(--color-text); letter-spacing: -0.02em;">Insight Harian Produk</h1>
+    <p style="color: var(--color-text-muted); font-size: 0.92rem; max-width: 720px; line-height: 1.5;">
+      Perbandingan hasil scraping produk dengan periode sebelumnya: produk baru, produk hilang, lonjakan revenue, dan toko yang makin dominan. Angka dihitung sistem; ringkasan ditulis AI.
+    </p>
+  </div>
+  <form method="get" style="display: flex; gap: 0.6rem; align-items: center;">
+    <select name="country" class="form-select" onchange="this.form.period.value=''; this.form.submit()">
+      {% for c in countries %}<option value="{{ c }}" {% if c == selected_country %}selected{% endif %}>{{ c }}</option>{% endfor %}
+    </select>
+    <select name="period" class="form-select" onchange="this.form.submit()">
+      {% for p in periods %}<option value="{{ p.isoformat() }}" {% if p == selected_period %}selected{% endif %}>Data {{ p.strftime('%d %b %Y') }}</option>{% endfor %}
+    </select>
+  </form>
+</div>
+
+{% if not diff %}
+<div class="card-kurma"><p>Belum ada data produk untuk {{ selected_country }}.</p></div>
+{% else %}
+{% set t = diff.totals %}
+{% set cur = diff.currency %}
+
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
+  <div class="card-kurma" style="border-left: 4px solid var(--color-success); margin-bottom: 0;">
+    <div style="font-size: 0.8rem; color: var(--color-text-muted);">Produk baru</div>
+    <div style="font-size: 1.6rem; font-weight: 800;">{{ t.new }}</div>
+  </div>
+  <div class="card-kurma" style="border-left: 4px solid var(--color-danger); margin-bottom: 0;">
+    <div style="font-size: 0.8rem; color: var(--color-text-muted);">Produk hilang</div>
+    <div style="font-size: 1.6rem; font-weight: 800;">{{ t.gone }}</div>
+  </div>
+  <div class="card-kurma" style="border-left: 4px solid var(--color-info); margin-bottom: 0;">
+    <div style="font-size: 0.8rem; color: var(--color-text-muted);">Total produk (sebelumnya)</div>
+    <div style="font-size: 1.6rem; font-weight: 800;">{{ t.products }} <span style="font-size: 0.9rem; color: var(--color-text-muted);">/ {{ t.prev_products }}</span></div>
+  </div>
+  <div class="card-kurma" style="border-left: 4px solid var(--color-primary); margin-bottom: 0;">
+    <div style="font-size: 0.8rem; color: var(--color-text-muted);">Total revenue</div>
+    <div style="font-size: 1.1rem; font-weight: 800;">{{ money(t.revenue, cur) }}</div>
+    <div style="font-size: 0.85rem;">{{ pct(t.revenue_change_pct) }}</div>
+  </div>
+</div>
+
+<div class="card-kurma" style="margin-bottom: 1.5rem;">
+  <div style="display: flex; justify-content: space-between; align-items: center; gap: 1rem; flex-wrap: wrap; margin-bottom: 0.75rem;">
+    <h2 style="font-size: 1.1rem; font-weight: 800;">Ringkasan AI</h2>
+    <form method="post" action="{{ url_for('insights.rebuild') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+      <input type="hidden" name="country" value="{{ selected_country }}"/>
+      <input type="hidden" name="period" value="{{ selected_period.isoformat() }}"/>
+      <button type="submit" class="btn-kurma-secondary">Hitung ulang{% if ai_enabled %} + ringkasan AI{% endif %}</button>
+    </form>
+  </div>
+  <div style="font-size: 0.85rem; color: var(--color-text-muted); margin-bottom: 0.75rem;">
+    Data {{ diff.period }} dibandingkan dengan {{ diff.compared_period or '— (belum ada data sebelumnya)' }}
+    {% if insight.ai_model %} · model {{ insight.ai_model }}{% endif %}
+  </div>
+  {% if insight.ai_summary %}
+  <div style="white-space: pre-wrap; line-height: 1.6; font-size: 0.93rem;">{{ insight.ai_summary }}</div>
+  {% elif not ai_enabled %}
+  <p style="color: var(--color-text-muted);">AI belum aktif. Set <code>LLM_API_KEY</code> dan <code>LLM_MODEL</code> di .env untuk ringkasan otomatis.</p>
+  {% else %}
+  <p style="color: var(--color-text-muted);">Belum ada ringkasan. Klik "Hitung ulang + ringkasan AI".</p>
+  {% endif %}
+</div>
+
+<div class="card-kurma" style="margin-bottom: 1.5rem;">
+  <h2 style="font-size: 1.1rem; font-weight: 800; margin-bottom: 0.75rem;">Produk baru ({{ t.new }})</h2>
+  {{ product_table(diff.new_products, 'list', cur) }}
+</div>
+
+<div class="card-kurma" style="margin-bottom: 1.5rem;">
+  <h2 style="font-size: 1.1rem; font-weight: 800; margin-bottom: 0.75rem;">Revenue naik tajam &ge;50% ({{ t.revenue_up_count }})</h2>
+  {{ product_table(diff.revenue_up, 'move', cur) }}
+</div>
+
+<div class="card-kurma" style="margin-bottom: 1.5rem;">
+  <h2 style="font-size: 1.1rem; font-weight: 800; margin-bottom: 0.75rem;">Revenue turun tajam &ge;50% ({{ t.revenue_down_count }})</h2>
+  {{ product_table(diff.revenue_down, 'move', cur) }}
+</div>
+
+<div class="card-kurma" style="margin-bottom: 1.5rem;">
+  <h2 style="font-size: 1.1rem; font-weight: 800; margin-bottom: 0.75rem;">Produk hilang dari daftar ({{ t.gone }})</h2>
+  {{ product_table(diff.gone_products, 'list', cur) }}
+</div>
+
+<div class="card-kurma" style="margin-bottom: 1.5rem;">
+  <h2 style="font-size: 1.1rem; font-weight: 800; margin-bottom: 0.75rem;">Toko paling banyak produk</h2>
+  {% if diff.top_shops %}
+  <div class="table-wrapper">
+    <table class="kurma-table">
+      <thead><tr><th>Toko</th><th>Jumlah produk</th><th>Sebelumnya</th><th>Perubahan</th></tr></thead>
+      <tbody>
+        {% for s in diff.top_shops %}
+        <tr><td>{{ s.shop }}</td><td>{{ s.count }}</td><td>{{ s.prev_count }}</td><td>{% if s.change > 0 %}+{% endif %}{{ s.change }}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+</div>
+{% endif %}
+{% endblock %}
