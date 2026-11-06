@@ -83,13 +83,8 @@ def rebuild():
         return redirect(url_for("insights.index", country=country))
     db = SessionLocal()
     try:
-        row = insight_service.build_insight(db, country, period, with_ai=True)
-        if llm_client.is_enabled() and not row.ai_summary:
-            flash("Perbandingan diperbarui, tapi ringkasan AI gagal dibuat (cek log).", "warning")
-        elif not llm_client.is_enabled():
-            flash("Perbandingan diperbarui. AI belum aktif (LLM_API_KEY / LLM_MODEL belum di-set).", "warning")
-        else:
-            flash("Perbandingan & ringkasan AI diperbarui.", "success")
+        insight_service.build_insight(db, country, period, with_ai=False)
+        flash("Perbandingan diperbarui.", "success")
     finally:
         db.close()
     return redirect(url_for("insights.index", country=country, period=period.isoformat()))

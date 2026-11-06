@@ -79,6 +79,7 @@ def create_app() -> Flask:
     from app.routes.api import api_bp
     from app.routes.analytics import analytics_bp
     from app.routes.insights import insights_bp
+    from app.routes.ai_chat import ai_chat_bp
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(dashboard_bp)
@@ -89,6 +90,7 @@ def create_app() -> Flask:
     app.register_blueprint(api_bp)
     app.register_blueprint(analytics_bp)
     app.register_blueprint(insights_bp)
+    app.register_blueprint(ai_chat_bp)
 
     # Start auto-scheduler background thread for standalone server
     from app.services.scheduler_service import SchedulerService
